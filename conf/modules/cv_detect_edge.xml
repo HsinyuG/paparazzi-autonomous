@@ -1,0 +1,52 @@
+<!DOCTYPE module SYSTEM "module.dtd">
+
+<module name="cv_detect_edge" dir="computer_vision">
+  <doc>
+    <description>Color Object Detector
+    Detects an object by a continuous color. Optionally draws on image.
+    
+    </description>
+    <define name="EDGE_DETECTOR_CAMERA1" value="front_camera|bottom_camera" description="Video device to use"/>
+    <define name="EDGE_DETECTOR_FPS1" value="0" description="Desired FPS (0: camera rate)"/>
+    <define name="EDGE_DETECTOR_SIGMA1" value="0" description="Filter 1 sigma"/>
+    <define name="EDGE_DETECTOR_TLOW1" value="0" description="Filter 1 tlow"/>
+    <define name="EDGE_DETECTOR_THIGH1" value="0" description="Filter 1 thigh"/>
+    <define name="EDGE_DETECTOR_DRAW1" value="FALSE|TRUE" description="Whether or not to draw on image"/>
+
+    <define name="EDGE_DETECTOR_CAMERA2" value="front_camera|bottom_camera" description="Video device to use"/>
+    <define name="EDGE_DETECTOR_FPS2" value="0" description="Desired FPS (0: camera rate)"/>
+    <define name="EDGE_DETECTOR_SIGMA2" value="0" description="Filter 2 sigma"/>
+    <define name="EDGE_DETECTOR_TLOW2" value="0" description="Filter 2 tlow"/>
+    <define name="EDGE_DETECTOR_THIGH2" value="0" description="Filter 2 thigh"/>
+    <define name="EDGE_DETECTOR_DRAW2" value="FALSE|TRUE" description="Whether or not to draw on image"/>
+  </doc>
+
+  <settings>
+    <dl_settings>
+      <dl_settings name="EdgeDetector">
+         <dl_setting var="sigma1" min="0" step="0.01" max="10" shortname="sigma1"/>
+         <dl_setting var="tlow1" min="0" step="0.01" max="1" shortname="tlow1"/>
+         <dl_setting var="thigh1"   min="0" step="0.01" max="1" shortname="thigh1"/>
+         <dl_setting var="cod_draw1"  min="0" step="1" max="1" values="False|True" shortname="draw 1" />
+         <dl_setting var="sigma2" min="0.6" step="0.01" max="2.4" shortname="sigma2"/>
+         <dl_setting var="tlow2" min="0.2" step="0.01" max="0.5" shortname="tlow2"/>
+         <dl_setting var="thigh2"   min="0.6" step="0.01" max="0.9" shortname="thigh2"/>
+         <dl_setting var="cod_draw2"  min="0" step="1" max="1" values="False|True" shortname="draw 2" />
+      </dl_settings>
+    </dl_settings>
+  </settings>
+
+  <dep>
+    <depends>video_thread</depends>
+  </dep>
+
+  <header>
+    <file name="cv_detect_edge.h"/>
+  </header>
+
+  <init fun="edge_detector_init()"/>
+  <periodic fun="edge_detector_periodic()" freq="50"/>
+  <makefile target="ap|nps">
+    <file name="cv_detect_edge.c"/>
+  </makefile>
+</module>
