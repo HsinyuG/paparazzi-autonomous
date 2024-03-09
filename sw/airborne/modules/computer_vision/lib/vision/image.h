@@ -80,8 +80,13 @@ struct flow_t {
   int32_t flow_x;             ///< The x direction flow in subpixels
   int32_t flow_y;             ///< The y direction flow in subpixels
   uint32_t error;             ///< The matching error in the tracking process in subpixels
+  struct magnitude mag;       ///< The magnitude of flow
 };
 
+struct magnitude {
+  int32_t left;             ///< left sum optic flow
+  int32_t right;	    ///< right sum optic flow
+};
 /* Image size structure */
 struct img_size_t {
   uint16_t w;     ///< The width
