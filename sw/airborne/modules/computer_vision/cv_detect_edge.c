@@ -69,15 +69,16 @@ bool cod_draw2 = false;
 
 // define global variables
 struct edge_t {
-  int32_t x_c;
-  int32_t y_c;
-  uint32_t higest_coloumn;
+  // int32_t x_c;
+  // int32_t y_c;
+  uint16_t higest_column_idx;
+  uint16_t first_edge_height;
   bool updated;
 };
 struct edge_t global_filters[2];
 
 // Function
-uint32_t find_edge(struct image_t *img, bool draw, float sigma, float tlow, float thigh);
+void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, float sigma, float tlow, float thigh);
 
 unsigned char * YUV2Gray(struct image_t *img);
 
@@ -91,9 +92,9 @@ static struct image_t *edge_detector(struct image_t *img, uint8_t filter)
 {
   float sigma, tlow, thigh;
   bool draw;
-
+  // printf("filter: %u\n", filter);
   switch (filter){
-    case 1:
+    case 1: // front camera
       sigma = sigma1;
       tlow = tlow1;
       thigh = thigh1;
@@ -110,10 +111,12 @@ static struct image_t *edge_detector(struct image_t *img, uint8_t filter)
   };
 
    // Filter and find centroid
-  uint32_t higest_coloumn = find_edge(img, draw, sigma, tlow, thigh);
+  struct edge_t local_filter;
+  find_edge(&local_filter, img, draw, sigma, tlow, thigh);
 
   pthread_mutex_lock(&mutex);
-  global_filters[filter-1].higest_coloumn = higest_coloumn;
+  global_filters[filter-1].higest_column_idx = local_filter.higest_column_idx;
+  global_filters[filter-1].first_edge_height = local_filter.first_edge_height;
   global_filters[filter-1].updated = true;
   pthread_mutex_unlock(&mutex);
 
@@ -214,7 +217,7 @@ unsigned char * YUV2Gray(struct image_t *img)
 }
 
 
-uint32_t find_edge(struct image_t *img, bool draw, float sigma, float tlow, float thigh)
+void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, float sigma, float tlow, float thigh)
 {
   uint8_t *buffer = img->buf;
   uint32_t rows = img->h;
@@ -226,6 +229,8 @@ uint32_t find_edge(struct image_t *img, bool draw, float sigma, float tlow, floa
 
   // Canny edge detection
   canny(gray, rows, cols, sigma, tlow, thigh, &edge, NULL);
+  // printf("%u", gray[20]);
+  free(gray);
 
 
   // Go through all the pixels
@@ -253,7 +258,55 @@ uint32_t find_edge(struct image_t *img, bool draw, float sigma, float tlow, floa
       }
     }
   }
-  return 0;
+
+  // find the lowest edge for each column
+  uint32_t edge_array_length = rows * cols;
+
+  uint16_t *first_edge_x_each_row = (uint16_t *)malloc(rows * sizeof(uint16_t));
+  uint16_t *first_edge_x_each_row_filtered = (uint16_t *)malloc(rows-2 * sizeof(uint16_t));
+  for (uint16_t i=0; i<rows; i++) {
+    first_edge_x_each_row[i] = cols+1; // set initial value to top of image
+  }
+  for (uint32_t i=0; i<edge_array_length; i++) {
+    // printf("%u", edge[i]);
+    uint32_t current_index = i; // edge_array_length - i - 1;
+    uint16_t current_x = current_index % cols;
+    uint16_t current_y = current_index / cols;
+    // printf("x: %u, ", current_x);
+    // printf("y: %u, ", current_y);
+    // printf("i: %u, ", current_index);
+    // printf("edge: %u; ", edge[current_index]);
+    if ((first_edge_x_each_row[current_y]==cols+1) && !edge[current_index]) {
+      first_edge_x_each_row[current_y] = current_x;
+    }
+  }
+  
+  // find the column with highest free space from bottom
+  uint16_t row_with_largest_space = rows/2;
+  int16_t largest_first_edge_x = -1; // max x is < 255 so okay
+  printf("cols: %d,", cols);
+
+  // median filtering, find the largest space
+  for (uint32_t i=1; i<rows-1; i++) {
+    first_edge_x_each_row_filtered[i-1] = (first_edge_x_each_row[i-1] + first_edge_x_each_row[i] + first_edge_x_each_row[i+1])/3;
+    // printf("%u: %u, ", i-1, first_edge_x_each_row_filtered[i-1]);
+    if (first_edge_x_each_row_filtered[i-1] > largest_first_edge_x) {
+      largest_first_edge_x = first_edge_x_each_row_filtered[i-1];
+      row_with_largest_space = i;
+    }
+  } 
+  if (largest_first_edge_x == -1) {largest_first_edge_x = cols;}
+  // TODO: sliding window
+  // buffer[least_first_edge_y * 2 * cols + 2 * highest_column_x - 2] = -37.52415; // U
+  // buffer[least_first_edge_y * 2 * cols + 2 * highest_column_x] = 157.27575;     // V
+  // buffer[least_first_edge_y * 2 * cols + 2 * highest_column_x + 1] = 76.245;    // Y
+  printf("free direction: %u, ", row_with_largest_space);
+  printf("in 0 - %u\n", rows);
+  free(first_edge_x_each_row);
+  free(first_edge_x_each_row_filtered);
+  local_filter_ptr->first_edge_height = largest_first_edge_x;
+  local_filter_ptr->higest_column_idx = row_with_largest_space;
+  return;
 }
 
 void edge_detector_periodic(void)
@@ -263,16 +316,16 @@ void edge_detector_periodic(void)
   memcpy(local_filters, global_filters, 2*sizeof(struct edge_t));
   pthread_mutex_unlock(&mutex);
 
-  /*
+  
   if(local_filters[0].updated){
-    AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION1_ID, local_filters[0].x_c, local_filters[0].y_c,
-        0, 0, local_filters[0].color_count, 0);
+    AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION1_ID, 0, 0,
+        0, 0, local_filters[0].first_edge_height, local_filters[0].higest_column_idx); // second last element is the the free space height, int32_t, range (0,240)
     local_filters[0].updated = false;
   }
   if(local_filters[1].updated){
-    AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION2_ID, local_filters[1].x_c, local_filters[1].y_c,
-        0, 0, local_filters[1].color_count, 1);
+    AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION2_ID, 0, 0,
+        0, 0, local_filters[1].first_edge_height, local_filters[1].higest_column_idx);
     local_filters[1].updated = false;
   }
-  */
+  
 }

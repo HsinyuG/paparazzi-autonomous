@@ -5,12 +5,12 @@
   </description>
 
   <firmware name="rotorcraft">
-    <target name="ap" board="bebop">
+    <!-- <target name="ap" board="bebop">
       <define name="VIDEO_CAPTURE_PATH" value="/data/ftp/internal_000/images"/>
       <define name="LOGGER_FILE_PATH" value="/data/ftp/internal_000/log"/>
       <define name="MT9V117_TARGET_FPS" value="20"/>
       
-      <!-- Detect orange -->
+      Detect orange
       <define name="COLOR_OBJECT_DETECTOR_LUM_MIN1" value="30"/>
       <define name="COLOR_OBJECT_DETECTOR_LUM_MAX1" value="170"/>
       <define name="COLOR_OBJECT_DETECTOR_CB_MIN1" value="70"/>
@@ -18,7 +18,7 @@
       <define name="COLOR_OBJECT_DETECTOR_CR_MIN1" value="150"/>
       <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="190"/>
       
-      <!-- Detect green -->
+      Detect green
       <define name="COLOR_OBJECT_DETECTOR_LUM_MIN2" value="60"/>
       <define name="COLOR_OBJECT_DETECTOR_LUM_MAX2" value="130"/>
       <define name="COLOR_OBJECT_DETECTOR_CB_MIN2" value="75"/>
@@ -31,7 +31,7 @@
       <define name="VIDEO_CAPTURE_PATH" value="/tmp/paparazzi/images"/>
       <define name="LOGGER_FILE_PATH" value="/tmp/paparazzi/log"/>
       
-      <!-- Detect orange -->
+      Detect orange
       <define name="COLOR_OBJECT_DETECTOR_LUM_MIN1" value="41"/>
       <define name="COLOR_OBJECT_DETECTOR_LUM_MAX1" value="183"/>
       <define name="COLOR_OBJECT_DETECTOR_CB_MIN1" value="53"/>
@@ -39,13 +39,33 @@
       <define name="COLOR_OBJECT_DETECTOR_CR_MIN1" value="134"/>
       <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="249"/>
       
-      <!-- Detect green -->
+      Detect green
       <define name="COLOR_OBJECT_DETECTOR_LUM_MIN2" value="0"/>
       <define name="COLOR_OBJECT_DETECTOR_LUM_MAX2" value="255"/>
       <define name="COLOR_OBJECT_DETECTOR_CB_MIN2" value="0"/>
       <define name="COLOR_OBJECT_DETECTOR_CB_MAX2" value="110"/>
       <define name="COLOR_OBJECT_DETECTOR_CR_MIN2" value="0"/>
       <define name="COLOR_OBJECT_DETECTOR_CR_MAX2" value="130"/>
+    </target> -->
+    <target name="ap" board="bebop">
+      <define name="VIDEO_CAPTURE_PATH" value="/data/ftp/internal_000/images"/>
+      <define name="LOGGER_FILE_PATH" value="/data/ftp/internal_000/log"/>
+      <define name="MT9V117_TARGET_FPS" value="20"/>
+      
+      <!-- Detect orange -->
+      <define name="EDGE_DETECTOR_SIGMA1" value="0.6"/>
+      <define name="EDGE_DETECTOR_TLOW1" value="0.5"/>
+      <define name="EDGE_DETECTOR_THIGH1" value="0.8"/>
+    </target>
+    <target name="nps" board="pc">
+      <module name="fdm" type="gazebo"/>
+      <define name="VIDEO_CAPTURE_PATH" value="/tmp/paparazzi/images"/>
+      <define name="LOGGER_FILE_PATH" value="/tmp/paparazzi/log"/>
+      
+      <!-- Detect orange -->
+      <define name="EDGE_DETECTOR_SIGMA1" value="0.6"/>
+      <define name="EDGE_DETECTOR_TLOW1" value="0.5"/>
+      <define name="EDGE_DETECTOR_THIGH1" value="0.8"/>
     </target>
 
   <!-- Subsystem section -->
@@ -74,7 +94,7 @@
       <define name="VIDEO_CAPTURE_CAMERA" value="front_camera"/>
       <define name="VIDEO_CAPTURE_FPS" value="10"/>
     </module>
-    <module name="cv_detect_color_object">
+    <!-- <module name="cv_detect_color_object">
       <define name="COLOR_OBJECT_DETECTOR_CAMERA1" value="front_camera"/>
       <define name="COLOR_OBJECT_DETECTOR_FPS1" value="0"/>
       <define name="COLOR_OBJECT_DETECTOR_DRAW1" value="1"/>
@@ -86,6 +106,11 @@
     <module name="orange_avoider_guided">
       <define name="ORANGE_AVOIDER_VISUAL_DETECTION_ID" value="COLOR_OBJECT_DETECTION1_ID"/>
       <define name="FLOOR_VISUAL_DETECTION_ID" value="COLOR_OBJECT_DETECTION2_ID"/>
+    </module> -->
+    <module name="cv_detect_edge">
+      <define name="EDGE_DETECTOR_CAMERA1" value="front_camera"/>
+      <define name="EDGE_DETECTOR_FPS1" value="0"/>
+      <define name="EDGE_DETECTOR_DRAW1" value="1"/>
     </module>
     <module name="video_rtp_stream">
       <define name="VIEWVIDEO_CAMERA" value="front_camera"/>
