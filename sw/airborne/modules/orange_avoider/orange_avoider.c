@@ -37,6 +37,7 @@
 #define VERBOSE_PRINT(...)
 #endif
 
+static uint8_t moveWaypointDirection(uint8_t waypoint, float distanceMeters, float direction);
 static uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters);
 static uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters);
 static uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor);
@@ -52,13 +53,15 @@ enum navigation_state_t {
 
 // define settings
 float oa_color_count_frac = 0.18f;
+float angular_vel = 0.05f; // degree per pixel per loop, loop is in 4 Hz
+float maxDistance = 2.25f;               // max waypoint displacement [m]
+float k_vel = 0.01f;
 
 // define and initialise global variables
 enum navigation_state_t navigation_state = SEARCH_FOR_SAFE_HEADING;
 int32_t color_count = 0;                // orange color count from color filter for obstacle detection
 int16_t obstacle_free_confidence = 0;   // a measure of how certain we are that the way ahead is safe.
 float heading_increment = 5.f;          // heading angle increment [deg]
-float maxDistance = 2.25;               // max waypoint displacement [m]
 
 const int16_t max_trajectory_confidence = 5; // number of consecutive negative object detections to be sure we are obstacle free
 
@@ -81,6 +84,19 @@ static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
   color_count = quality;
 }
 
+
+uint16_t highest_column_index;
+uint16_t first_edge_height;
+static abi_event opticflow_detection_ev;
+static void opticflow_detection_cb(uint8_t __attribute__((unused)) sender_id,
+                               int16_t __attribute__((unused)) pixel_x, int16_t __attribute__((unused)) pixel_y,
+                               int16_t __attribute__((unused)) pixel_width, int16_t __attribute__((unused)) pixel_height,
+                               int32_t quality, int16_t extra)
+{
+  first_edge_height = (uint16_t)quality; // (0, 240)
+  highest_column_index = (uint16_t)extra; // (0, 520)
+}
+
 /*
  * Initialisation function, setting the colour filter, random seed and heading_increment
  */
@@ -92,6 +108,17 @@ void orange_avoider_init(void)
 
   // bind our colorfilter callbacks to receive the color filter outputs
   AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
+}
+
+void opticflow_avoider_init(void)
+{
+  // Initialise random values
+  srand(time(NULL));
+  chooseRandomIncrementAvoidance();
+
+  // bind our colorfilter callbacks to receive the color filter outputs
+  // AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &edge_detection_ev, edge_detection_cb);
+  AbibindMsgOPTICAL_FLOW(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &opticflow_detection_ev, opticflow_detection_cb);
 }
 
 /*
@@ -174,12 +201,113 @@ void orange_avoider_periodic(void)
   return;
 }
 
+void opticflow_avoider_periodic(void)
+{
+  // only evaluate our state machine if we are flying
+  if(!autopilot_in_flight()){
+    return;
+  }
+
+  // update our safe confidence using direction threshold
+  uint16_t direction_threshold = 100; // pixel, total is 520 in width, 240 in height for parrot bebop
+  uint16_t free_space_threshold = 100; // pixel
+  uint16_t img_width = 520; // should be front_camera.output_size.w
+
+  float moveDistance = fmin(maxDistance, first_edge_height * k_vel);
+  // moveDistance = 0.0f; //debug
+  printf("current state: %d\n", navigation_state);
+  // WP_TRAJECTORY and WP_GOAL are two waypoint id, WP_TRAJECTORY is the predicted one, WP_GOAL is the current target
+  switch (navigation_state){
+    case SAFE:
+      // Move waypoint forward
+      // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, 0.5f);
+      moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
+      if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
+        navigation_state = OUT_OF_BOUNDS;
+      } else if (first_edge_height <= free_space_threshold){
+        navigation_state = OBSTACLE_FOUND; // no direction to go in current yaw
+      } else {
+        moveWaypointDirection(WP_GOAL, moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
+        // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, 0.5f);
+        increase_nav_heading(angular_vel * (float)(highest_column_index - img_width/2)); // not minus because the yaw seems CW as +
+        // printf("angle to increase: %f", angular_vel * (highest_column_index - img_width/2))
+      }
+
+      break;
+    case OBSTACLE_FOUND:
+      // stop
+      waypoint_move_here_2d(WP_GOAL);
+      waypoint_move_here_2d(WP_TRAJECTORY);
+
+      // randomly select new search direction
+      chooseRandomIncrementAvoidance();
+
+      navigation_state = SEARCH_FOR_SAFE_HEADING;
+
+      break;
+    case SEARCH_FOR_SAFE_HEADING:
+      increase_nav_heading(heading_increment);
+
+      // make sure we have a couple of good readings before declaring the way safe
+      if (first_edge_height >= free_space_threshold){
+        navigation_state = SAFE;
+      }
+      break;
+    case OUT_OF_BOUNDS: // keep rotating when prediction is outside the arena, and when inside, rotate a little more
+      increase_nav_heading(heading_increment);
+      // moveWaypointForward(WP_TRAJECTORY, 1.5f);
+      moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
+      // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, 0.5f);
+
+      if (InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
+        // add offset to head back into arena
+        increase_nav_heading(heading_increment);
+
+        // reset safe counter
+        // obstacle_free_confidence = 0;
+
+        // ensure direction is safe before continuing
+        navigation_state = SEARCH_FOR_SAFE_HEADING;
+      }
+      break;
+    default:
+      break;
+  }
+  return;
+}
+/**
+ * @brief move 2D waypoint to new position considering the desired change of direction, but not change the direction of drone
+ * 
+ * @param waypoint which waypoint to move
+ * @param distanceMeters 0 to 2.25
+ * @param direction -0.5 to 0.5, CCW is +
+ * @return uint8_t 
+ * @retval 0       
+ */
+uint8_t moveWaypointDirection(uint8_t waypoint, float distanceMeters, float direction) 
+{
+  struct EnuCoor_i new_coor;
+  float heading = stateGetNedToBodyEulers_f()->psi; // find the zyx eular rads, psi is yaw
+  printf("current psi: %f, ", heading);
+  heading -= 2*3.14159f/3 * direction; // minus because the yaw seems CW
+
+  // Now determine where to place the waypoint you want to go to
+  // it seems the heading is CW from +y axis
+  new_coor.x = stateGetPositionEnu_i()->x + POS_BFP_OF_REAL(sinf(heading) * (distanceMeters));
+  new_coor.y = stateGetPositionEnu_i()->y + POS_BFP_OF_REAL(cosf(heading) * (distanceMeters));
+  moveWaypoint(waypoint, &new_coor);
+  
+  printf("new psi: %f, ", heading);
+  return false;
+}
+
 /*
  * Increases the NAV heading. Assumes heading is an INT32_ANGLE. It is bound in this function.
  */
 uint8_t increase_nav_heading(float incrementDegrees)
 {
-  float new_heading = stateGetNedToBodyEulers_f()->psi + RadOfDeg(incrementDegrees);
+  // float new_heading = stateGetNedToBodyEulers_f()->psi + RadOfDeg(incrementDegrees);
+    float new_heading = stateGetNedToBodyEulers_f()->psi + (incrementDegrees) * 3.1415926f / 180.0f;
 
   // normalize heading to [-pi, pi]
   FLOAT_ANGLE_NORMALIZE(new_heading);
@@ -187,7 +315,7 @@ uint8_t increase_nav_heading(float incrementDegrees)
   // set heading, declared in firmwares/rotorcraft/navigation.h
   nav.heading = new_heading;
 
-  VERBOSE_PRINT("Increasing heading to %f\n", DegOfRad(new_heading));
+  VERBOSE_PRINT("Increasing heading from %f to %f\n", stateGetNedToBodyEulers_f()->psi, new_heading);
   return false;
 }
 
@@ -197,7 +325,7 @@ uint8_t increase_nav_heading(float incrementDegrees)
 uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters)
 {
   struct EnuCoor_i new_coor;
-  calculateForwards(&new_coor, distanceMeters);
+  calculateForwards(&new_coor, distanceMeters); // inside the function, get the float zyx eular rads from states.h, and calc new coordinate forward
   moveWaypoint(waypoint, &new_coor);
   return false;
 }
@@ -207,9 +335,10 @@ uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters)
  */
 uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters)
 {
-  float heading  = stateGetNedToBodyEulers_f()->psi;
+  float heading  = stateGetNedToBodyEulers_f()->psi; // find the zyx eular rads, psi is yaw
 
   // Now determine where to place the waypoint you want to go to
+  // use binary fixed point instead float in the coordinate system for speed and efficiency; type like uint32_t can be treated as BFP when using
   new_coor->x = stateGetPositionEnu_i()->x + POS_BFP_OF_REAL(sinf(heading) * (distanceMeters));
   new_coor->y = stateGetPositionEnu_i()->y + POS_BFP_OF_REAL(cosf(heading) * (distanceMeters));
   VERBOSE_PRINT("Calculated %f m forward position. x: %f  y: %f based on pos(%f, %f) and heading(%f)\n", distanceMeters,	
@@ -225,7 +354,7 @@ uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor)
 {
   VERBOSE_PRINT("Moving waypoint %d to x:%f y:%f\n", waypoint, POS_FLOAT_OF_BFP(new_coor->x),
                 POS_FLOAT_OF_BFP(new_coor->y));
-  waypoint_move_xy_i(waypoint, new_coor->x, new_coor->y);
+  waypoint_move_xy_i(waypoint, new_coor->x, new_coor->y); // waypoint should be an id; not know how it works
   return false;
 }
 
@@ -244,4 +373,3 @@ uint8_t chooseRandomIncrementAvoidance(void)
   }
   return false;
 }
-

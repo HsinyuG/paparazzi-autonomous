@@ -15,10 +15,16 @@
 
 // settings
 extern float oa_color_count_frac;
+extern float angular_vel;
+extern float maxDistance;
+extern float k_vel;
 
 // functions
 extern void orange_avoider_init(void);
 extern void orange_avoider_periodic(void);
+
+extern void opticflow_avoider_init(void);
+extern void opticflow_avoider_periodic(void);
 
 #endif
 
