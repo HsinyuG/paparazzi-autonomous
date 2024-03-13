@@ -27,8 +27,13 @@
 #ifndef OPTICFLOW_MODULE_H
 #define OPTICFLOW_MODULE_H
 
+#ifndef AVOID_OPTICFLOW_ID
+#define AVOID_OPTICFLOW_ID 10
+#endif
+
 // Include opticflow calculator
 #include "opticflow/opticflow_calculator.h"
+
 
 // Needed for settings
 extern struct opticflow_t opticflow[];

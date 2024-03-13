@@ -53,9 +53,12 @@ enum navigation_state_t {
 
 // define settings
 float oa_color_count_frac = 0.18f;
-float angular_vel = 0.05f; // degree per pixel per loop, loop is in 4 Hz
-float maxDistance = 2.25f;               // max waypoint displacement [m]
-float k_vel = 0.01f;
+float angular_vel = 0.05f; // 0.25 degree per pixel per loop, loop is in 4 Hz
+float maxDistance = 2.25f;              // max waypoint displacement [m]
+float k_vel = 0.01f; // 42
+float k_psi = 0.05f; // proportion / difference between left right intensity, max is 0.5
+float k_lpf = 0.1f;
+float opticflow_free_space_threshold = 10.0f; // 42 pixel
 
 // define and initialise global variables
 enum navigation_state_t navigation_state = SEARCH_FOR_SAFE_HEADING;
@@ -85,16 +88,18 @@ static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
 }
 
 
-uint16_t highest_column_index;
-uint16_t first_edge_height;
+// uint16_t highest_column_index;
+// uint16_t first_edge_height;
+float left_intensity;
+float right_intensity;
 static abi_event opticflow_detection_ev;
-static void opticflow_detection_cb(uint8_t __attribute__((unused)) sender_id,
-                               int16_t __attribute__((unused)) pixel_x, int16_t __attribute__((unused)) pixel_y,
-                               int16_t __attribute__((unused)) pixel_width, int16_t __attribute__((unused)) pixel_height,
-                               int32_t quality, int16_t extra)
+static void opticflow_detection_cb(uint8_t sender_id __attribute__((unused)), uint32_t __attribute__((unused)) stamp, 
+                                  int32_t __attribute__((unused))  flow_x, int32_t __attribute__((unused)) flow_y, 
+                                  int32_t __attribute__((unused)) flow_der_x, int32_t __attribute__((unused)) flow_der_y, 
+                                  float quality, float size_div)
 {
-  first_edge_height = (uint16_t)quality; // (0, 240)
-  highest_column_index = (uint16_t)extra; // (0, 520)
+  left_intensity = k_lpf * quality + (1-k_lpf) * left_intensity; 
+  right_intensity = k_lpf * size_div + (1-k_lpf) * right_intensity;
 }
 
 /*
@@ -118,7 +123,7 @@ void opticflow_avoider_init(void)
 
   // bind our colorfilter callbacks to receive the color filter outputs
   // AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &edge_detection_ev, edge_detection_cb);
-  AbibindMsgOPTICAL_FLOW(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &opticflow_detection_ev, opticflow_detection_cb);
+  AbiBindMsgOPTICAL_FLOW(FLOW_OPTICFLOW_ID, &opticflow_detection_ev, opticflow_detection_cb);
 }
 
 /*
@@ -130,7 +135,6 @@ void orange_avoider_periodic(void)
   if(!autopilot_in_flight()){
     return;
   }
-
   // compute current color thresholds
   int32_t color_count_threshold = oa_color_count_frac * front_camera.output_size.w * front_camera.output_size.h;
 
@@ -207,29 +211,30 @@ void opticflow_avoider_periodic(void)
   if(!autopilot_in_flight()){
     return;
   }
-
+  VERBOSE_PRINT("left after filter = %f\n", left_intensity);
+  VERBOSE_PRINT("right after filter = %f\n", right_intensity);
   // update our safe confidence using direction threshold
   uint16_t direction_threshold = 100; // pixel, total is 520 in width, 240 in height for parrot bebop
-  uint16_t free_space_threshold = 100; // pixel
   uint16_t img_width = 520; // should be front_camera.output_size.w
 
-  float moveDistance = fmin(maxDistance, first_edge_height * k_vel);
+  float moveDistance = fmin(maxDistance, 2.0f / (left_intensity + right_intensity) * k_vel);
   // moveDistance = 0.0f; //debug
   printf("current state: %d\n", navigation_state);
   // WP_TRAJECTORY and WP_GOAL are two waypoint id, WP_TRAJECTORY is the predicted one, WP_GOAL is the current target
   switch (navigation_state){
     case SAFE:
       // Move waypoint forward
-      // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, 0.5f);
-      moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
+      moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, k_psi * (- left_intensity + right_intensity)); // CCW is +
+      // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         navigation_state = OUT_OF_BOUNDS;
-      } else if (first_edge_height <= free_space_threshold){
+      } else if ((left_intensity + right_intensity)/2.0f >= opticflow_free_space_threshold){
         navigation_state = OBSTACLE_FOUND; // no direction to go in current yaw
       } else {
-        moveWaypointDirection(WP_GOAL, moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
+        // moveWaypointDirection(WP_GOAL, moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
+        moveWaypointDirection(WP_GOAL, moveDistance, k_psi * (- left_intensity + right_intensity)); // CCW is +
         // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, 0.5f);
-        increase_nav_heading(angular_vel * (float)(highest_column_index - img_width/2)); // not minus because the yaw seems CW as +
+        increase_nav_heading(angular_vel * (left_intensity - right_intensity)); // CW is +
         // printf("angle to increase: %f", angular_vel * (highest_column_index - img_width/2))
       }
 
@@ -249,14 +254,15 @@ void opticflow_avoider_periodic(void)
       increase_nav_heading(heading_increment);
 
       // make sure we have a couple of good readings before declaring the way safe
-      if (first_edge_height >= free_space_threshold){
+      if ((left_intensity + right_intensity)/2.0f <= opticflow_free_space_threshold){
         navigation_state = SAFE;
       }
       break;
     case OUT_OF_BOUNDS: // keep rotating when prediction is outside the arena, and when inside, rotate a little more
       increase_nav_heading(heading_increment);
       // moveWaypointForward(WP_TRAJECTORY, 1.5f);
-      moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
+      // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
+      moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, k_psi * (- left_intensity + right_intensity)); // CCW is +
       // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, 0.5f);
 
       if (InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
@@ -280,7 +286,7 @@ void opticflow_avoider_periodic(void)
  * 
  * @param waypoint which waypoint to move
  * @param distanceMeters 0 to 2.25
- * @param direction -0.5 to 0.5, CCW is +
+ * @param direction -0.5 to 0.5, CCW is +, the proportion in 120 degree turning range
  * @return uint8_t 
  * @retval 0       
  */

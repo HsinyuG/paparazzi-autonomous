@@ -65,13 +65,14 @@ PRINT_CONFIG_VAR(OPTICFLOW_FPS_CAMERA2)
 #define ACTIVE_CAMERAS 1
 #endif
 
+
 /* The main opticflow variables */
 struct opticflow_t opticflow[ACTIVE_CAMERAS];                         ///< Opticflow calculations
 static struct opticflow_result_t opticflow_result[ACTIVE_CAMERAS];    ///< The opticflow result
 
 static bool opticflow_got_result[ACTIVE_CAMERAS];       ///< When we have an optical flow calculation
 
-static int opticflow_magnitude[2*ACTIVE_CAMERAS];
+static float opticflow_magnitude[2*ACTIVE_CAMERAS];
 
 static pthread_mutex_t opticflow_mutex;                  ///< Mutex lock fo thread safety
 
@@ -158,10 +159,9 @@ void opticflow_module_run(void)
       //                               -1.0f //opticflow_result.noise_measurement // negative value disables filter updates with OF-based vertical velocity.
       //                              );
       // }
-      AbiSendMsgOPTICAL_FLOW(FLOW_OPTICFLOW_ID + idx_camera, now_ts,
+      AbiSendMsgOPTICAL_FLOW(FLOW_OPTICFLOW_ID + idx_camera, now_ts, 0, 0, 0, 0,
                               opticflow_magnitude[2*idx_camera],
-                              opticflow_magnitude[2*idx_camera+1],
-                              0, 0, 0, 0);
+                              opticflow_magnitude[2*idx_camera+1]);
       opticflow_got_result[idx_camera] = false;
     }
   }
