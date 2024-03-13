@@ -174,13 +174,22 @@ struct image_t *opticflow_module_calc(struct image_t *img, uint8_t camera_id)
   // Copy the state
   // TODO : put accelerometer values at pose of img timestamp
   //struct opticflow_state_t temp_state;
+  uint8_t *buffer = img->buf;
   struct pose_t pose = get_rotation_at_timestamp(img->pprz_ts);
   img->eulers = pose.eulers;
 
   // Do the optical flow calculation
   static struct opticflow_result_t
     temp_result[ACTIVE_CAMERAS]; // static so that the number of corners is kept between frames
-  if (opticflow_calc_frame(&opticflow[camera_id], img, &temp_result[camera_id])) {
+
+
+
+  // define a variable to save the length of the right and left optic flow
+  float flow_length[2];
+  if (cal_opticflow_vector(&opticflow[camera_id], img, &temp_result[camera_id],flow_length)) {
+
+    printf("the optic flow in the left and right area is %f,%f\n",flow_length[0],flow_length[1]);
+
     // Copy the result if finished
     pthread_mutex_lock(&opticflow_mutex);
     opticflow_result[camera_id] = temp_result[camera_id];

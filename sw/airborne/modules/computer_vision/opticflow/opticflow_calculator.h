@@ -88,17 +88,8 @@ struct opticflow_t {
 #define FAST9_MAX_CORNERS 512
 
 extern void opticflow_calc_init(struct opticflow_t opticflow[]);
-extern bool opticflow_calc_frame(struct opticflow_t *opticflow, struct image_t *img,
-                                 struct opticflow_result_t *result);
-
-extern bool calc_fast9_lukas_kanade(struct opticflow_t *opticflow, struct image_t *img,
-                                    struct opticflow_result_t *result);
-extern bool calc_edgeflow_tot(struct opticflow_t *opticflow, struct image_t *img,
-                              struct opticflow_result_t *result);
-
-extern void kalman_filter_opticflow_velocity(float *velocity_x, float *velocity_y, float *acceleration_measurement,
-    float fps,
-    float *measurement_noise, float process_noise, bool reinitialize_kalman);
+bool cal_opticflow_vector(struct opticflow_t *opticflow, struct image_t *img,
+                       struct opticflow_result_t *result, float *flow_length);
 
 #endif /* OPTICFLOW_CALCULATOR_H */
 

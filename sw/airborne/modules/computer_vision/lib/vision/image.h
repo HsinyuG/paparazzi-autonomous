@@ -77,8 +77,8 @@ struct point3d_t {
 /* Vector structure for point differences */
 struct flow_t {
   struct point_t pos;         ///< The original position the flow comes from in subpixels
-  int32_t flow_x;             ///< The x direction flow in subpixels
-  int32_t flow_y;             ///< The y direction flow in subpixels
+  uint32_t flow_x;             ///< The x direction flow in subpixels
+  uint32_t flow_y;             ///< The y direction flow in subpixels
   uint32_t error;             ///< The matching error in the tracking process in subpixels
 };
 
