@@ -70,6 +70,9 @@ struct opticflow_t opticflow[ACTIVE_CAMERAS];                         ///< Optic
 static struct opticflow_result_t opticflow_result[ACTIVE_CAMERAS];    ///< The opticflow result
 
 static bool opticflow_got_result[ACTIVE_CAMERAS];       ///< When we have an optical flow calculation
+
+static int opticflow_magnitude[2*ACTIVE_CAMERAS];
+
 static pthread_mutex_t opticflow_mutex;                  ///< Mutex lock fo thread safety
 
 /* Static functions */
@@ -120,9 +123,9 @@ void opticflow_module_init(void)
   cv_add_to_device(&OPTICFLOW_CAMERA2, opticflow_module_calc, OPTICFLOW_FPS_CAMERA2, 1);
 #endif
 
-#if PERIODIC_TELEMETRY
-  register_periodic_telemetry(DefaultPeriodic, PPRZ_MSG_ID_OPTIC_FLOW_EST, opticflow_telem_send);
-#endif
+// #if PERIODIC_TELEMETRY
+//   register_periodic_telemetry(DefaultPeriodic, PPRZ_MSG_ID_OPTIC_FLOW_EST, opticflow_telem_send);
+// #endif
 
 }
 
@@ -137,24 +140,28 @@ void opticflow_module_run(void)
   for (int idx_camera = 0; idx_camera < ACTIVE_CAMERAS; idx_camera++) {
     if (opticflow_got_result[idx_camera]) {
       uint32_t now_ts = get_sys_time_usec();
+      // AbiSendMsgOPTICAL_FLOW(FLOW_OPTICFLOW_ID + idx_camera, now_ts,
+      //                        opticflow_result[idx_camera].flow_x,
+      //                        opticflow_result[idx_camera].flow_y,
+      //                        opticflow_result[idx_camera].flow_der_x,
+      //                        opticflow_result[idx_camera].flow_der_y,
+      //                        opticflow_result[idx_camera].noise_measurement,
+      //                        opticflow_result[idx_camera].div_size);
+      // //TODO Find an appropriate quality measure for the noise model in the state filter, for now it is tracked_cnt
+      // if (opticflow_result[idx_camera].noise_measurement < 0.8) {
+      //   AbiSendMsgVELOCITY_ESTIMATE(VEL_OPTICFLOW_ID + idx_camera, now_ts,
+      //                               opticflow_result[idx_camera].vel_body.x,
+      //                               opticflow_result[idx_camera].vel_body.y,
+      //                               0.0f, //opticflow_result.vel_body.z,
+      //                               opticflow_result[idx_camera].noise_measurement,
+      //                               opticflow_result[idx_camera].noise_measurement,
+      //                               -1.0f //opticflow_result.noise_measurement // negative value disables filter updates with OF-based vertical velocity.
+      //                              );
+      // }
       AbiSendMsgOPTICAL_FLOW(FLOW_OPTICFLOW_ID + idx_camera, now_ts,
-                             opticflow_result[idx_camera].flow_x,
-                             opticflow_result[idx_camera].flow_y,
-                             opticflow_result[idx_camera].flow_der_x,
-                             opticflow_result[idx_camera].flow_der_y,
-                             opticflow_result[idx_camera].noise_measurement,
-                             opticflow_result[idx_camera].div_size);
-      //TODO Find an appropriate quality measure for the noise model in the state filter, for now it is tracked_cnt
-      if (opticflow_result[idx_camera].noise_measurement < 0.8) {
-        AbiSendMsgVELOCITY_ESTIMATE(VEL_OPTICFLOW_ID + idx_camera, now_ts,
-                                    opticflow_result[idx_camera].vel_body.x,
-                                    opticflow_result[idx_camera].vel_body.y,
-                                    0.0f, //opticflow_result.vel_body.z,
-                                    opticflow_result[idx_camera].noise_measurement,
-                                    opticflow_result[idx_camera].noise_measurement,
-                                    -1.0f //opticflow_result.noise_measurement // negative value disables filter updates with OF-based vertical velocity.
-                                   );
-      }
+                              opticflow_magnitude[2*idx_camera],
+                              opticflow_magnitude[2*idx_camera+1],
+                              0, 0, 0, 0);
       opticflow_got_result[idx_camera] = false;
     }
   }
@@ -192,7 +199,9 @@ struct image_t *opticflow_module_calc(struct image_t *img, uint8_t camera_id)
 
     // Copy the result if finished
     pthread_mutex_lock(&opticflow_mutex);
-    opticflow_result[camera_id] = temp_result[camera_id];
+    // opticflow_result[camera_id] = temp_result[camera_id];
+    opticflow_magnitude[2*camera_id] = flow_length[0];
+    opticflow_magnitude[2*camera_id+1] = flow_length[1];
     opticflow_got_result[camera_id] = true;
     pthread_mutex_unlock(&opticflow_mutex);
   }
