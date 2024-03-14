@@ -99,7 +99,7 @@ static void opticflow_detection_cb(uint8_t sender_id __attribute__((unused)), ui
                                   float quality, float size_div)
 {
   left_intensity = k_lpf * quality + (1-k_lpf) * left_intensity; 
-  right_intensity = k_lpf * size_div + (1-k_lpf) * right_intensity;
+  right_intensity = k_lpf * size_div + (1-k_lpf) * right_intensity; 
 }
 
 /*

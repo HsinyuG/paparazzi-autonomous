@@ -58,6 +58,10 @@ float oag_floor_count_frac = 0.05f;       // floor detection threshold as a frac
 float oag_max_speed = 0.5f;               // max flight speed [m/s]
 float oag_heading_rate = RadOfDeg(20.f);  // heading change setpoint for avoidance [rad/s]
 
+float k_vel = 42.0f; // 42
+float k_lpf = 0.1f;
+float opticflow_free_space_threshold = 42.0f; // 42 pixel
+
 // define and initialise global variables
 enum navigation_state_t navigation_state = SEARCH_FOR_SAFE_HEADING;   // current state in state machine
 int32_t color_count = 0;                // orange color count from color filter for obstacle detection
@@ -96,6 +100,18 @@ static void floor_detection_cb(uint8_t __attribute__((unused)) sender_id,
   floor_centroid = pixel_y;
 }
 
+float left_intensity;
+float right_intensity;
+static abi_event opticflow_detection_ev;
+static void opticflow_detection_cb(uint8_t sender_id __attribute__((unused)), uint32_t __attribute__((unused)) stamp, 
+                                  int32_t __attribute__((unused))  flow_x, int32_t __attribute__((unused)) flow_y, 
+                                  int32_t __attribute__((unused)) flow_der_x, int32_t __attribute__((unused)) flow_der_y, 
+                                  float quality, float size_div)
+{
+  left_intensity = k_lpf * quality + (1-k_lpf) * left_intensity; 
+  right_intensity = k_lpf * size_div + (1-k_lpf) * right_intensity; 
+}
+
 /*
  * Initialisation function
  */
@@ -108,6 +124,18 @@ void orange_avoider_guided_init(void)
   // bind our colorfilter callbacks to receive the color filter outputs
   AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
   AbiBindMsgVISUAL_DETECTION(FLOOR_VISUAL_DETECTION_ID, &floor_detection_ev, floor_detection_cb);
+}
+
+void opticflow_avoider_guided_init(void)
+{
+  // Initialise random values
+  srand(time(NULL));
+  chooseRandomIncrementAvoidance();
+
+  // bind our colorfilter callbacks to receive the color filter outputs
+  // AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
+  // AbiBindMsgVISUAL_DETECTION(FLOOR_VISUAL_DETECTION_ID, &floor_detection_ev, floor_detection_cb);
+  AbiBindMsgOPTICAL_FLOW(FLOW_OPTICFLOW_ID, &opticflow_detection_ev, opticflow_detection_cb);
 }
 
 /*
@@ -196,6 +224,103 @@ void orange_avoider_guided_periodic(void)
         navigation_state = SAFE;
       }
       break;
+    default:
+      break;
+  }
+  return;
+}
+
+void opticflow_avoider_guided_periodic(void)
+{
+  // Only run the mudule if we are in the correct flight mode
+  if (guidance_h.mode != GUIDANCE_H_MODE_GUIDED) {
+    navigation_state = SEARCH_FOR_SAFE_HEADING;
+    obstacle_free_confidence = 0;
+    printf("not performing the periodic for this step\n");
+    return;
+  }
+
+  // // compute current color thresholds
+  // int32_t color_count_threshold = oag_color_count_frac * front_camera.output_size.w * front_camera.output_size.h;
+  // int32_t floor_count_threshold = oag_floor_count_frac * front_camera.output_size.w * front_camera.output_size.h;
+  // float floor_centroid_frac = floor_centroid / (float)front_camera.output_size.h / 2.f;
+
+  // VERBOSE_PRINT("Color_count: %d  threshold: %d state: %d \n", color_count, color_count_threshold, navigation_state);
+  // VERBOSE_PRINT("Floor count: %d, threshold: %d\n", floor_count, floor_count_threshold);
+  // VERBOSE_PRINT("Floor centroid: %f\n", floor_centroid_frac);
+
+  // // update our safe confidence using color threshold
+  // if(color_count < color_count_threshold){
+  //   obstacle_free_confidence++;
+  // } else {
+  //   obstacle_free_confidence -= 2;  // be more cautious with positive obstacle detections
+  // }
+
+  // // bound obstacle_free_confidence
+  // Bound(obstacle_free_confidence, 0, max_trajectory_confidence);
+
+  // float speed_sp = fminf(oag_max_speed, 0.2f * obstacle_free_confidence);
+  float speed_sp = fminf(oag_max_speed, 2.0f / (left_intensity + right_intensity) * k_vel);
+  VERBOSE_PRINT("left after filter = %f\n", left_intensity);
+  VERBOSE_PRINT("right after filter = %f\n", right_intensity);
+  printf("current state: %d\n", navigation_state);
+  switch (navigation_state){
+    case SAFE:
+      // if (floor_count < floor_count_threshold || fabsf(floor_centroid_frac) > 0.12){
+      //   navigation_state = OUT_OF_BOUNDS;
+      // } else
+      if ((left_intensity + right_intensity)/2.0f >= opticflow_free_space_threshold){
+        navigation_state = OBSTACLE_FOUND;
+      } else {
+        // option 1: when free fly forward, face obstacles then change yaw
+        guidance_h_set_body_vel(speed_sp, 0); 
+
+        // option 2: when free fly forward, fly towards to the most probable free space
+      }
+
+      break;
+    case OBSTACLE_FOUND:
+      // stop
+      guidance_h_set_body_vel(0, 0);
+
+      // randomly select new search direction
+      chooseRandomIncrementAvoidance();
+
+      navigation_state = SEARCH_FOR_SAFE_HEADING;
+
+      break;
+    case SEARCH_FOR_SAFE_HEADING:
+      guidance_h_set_heading_rate(avoidance_heading_direction * oag_heading_rate);
+
+      // make sure we have a couple of good readings before declaring the way safe
+      if ((left_intensity + right_intensity)/2.0f <= opticflow_free_space_threshold){
+        guidance_h_set_heading(stateGetNedToBodyEulers_f()->psi);
+        navigation_state = SAFE;
+      }
+      break;
+    // case OUT_OF_BOUNDS:
+    //   // stop
+    //   guidance_h_set_body_vel(0, 0);
+
+    //   // start turn back into arena
+    //   guidance_h_set_heading_rate(avoidance_heading_direction * RadOfDeg(15));
+
+    //   navigation_state = REENTER_ARENA;
+
+    //   break;
+    // case REENTER_ARENA:
+    //   // force floor center to opposite side of turn to head back into arena
+    //   if (floor_count >= floor_count_threshold && avoidance_heading_direction * floor_centroid_frac >= 0.f){
+    //     // return to heading mode
+    //     guidance_h_set_heading(stateGetNedToBodyEulers_f()->psi);
+
+    //     // reset safe counter
+    //     obstacle_free_confidence = 0;
+
+    //     // ensure direction is safe before continuing
+    //     navigation_state = SAFE;
+    //   }
+    //   break;
     default:
       break;
   }

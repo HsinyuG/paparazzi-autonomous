@@ -34,8 +34,21 @@ extern float oag_floor_count_frac;  // floor detection threshold as a fraction o
 extern float oag_max_speed;         // max flight speed [m/s]
 extern float oag_heading_rate;      // heading rate setpoint [rad/s]
 
+// settings
+// extern float oa_color_count_frac;
+extern float angular_vel;
+// extern float maxDistance;
+extern float k_vel;
+// extern float k_psi;
+extern float k_lpf;
+extern float opticflow_free_space_threshold;
+
+
 extern void orange_avoider_guided_init(void);
 extern void orange_avoider_guided_periodic(void);
+
+extern void opticflow_avoider_guided_init(void);
+extern void opticflow_avoider_guided_periodic(void);
 
 #endif
 
