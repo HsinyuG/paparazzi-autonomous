@@ -60,7 +60,12 @@ float oag_heading_rate = RadOfDeg(20.f);  // heading change setpoint for avoidan
 
 float k_vel = 42.0f; // 42
 float k_lpf = 0.1f;
+float k_lpf_bottom = 1.0f;
 float opticflow_free_space_threshold = 42.0f; // 42 pixel
+
+float color_count_threshold = 700.0f;
+
+float yaw_before_rotate;
 
 // define and initialise global variables
 enum navigation_state_t navigation_state = SEARCH_FOR_SAFE_HEADING;   // current state in state machine
@@ -83,7 +88,7 @@ static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
                                int16_t __attribute__((unused)) pixel_width, int16_t __attribute__((unused)) pixel_height,
                                int32_t quality, int16_t __attribute__((unused)) extra)
 {
-  color_count = quality;
+  color_count = k_lpf_bottom * quality + (1-k_lpf_bottom) * color_count;
 }
 
 #ifndef FLOOR_VISUAL_DETECTION_ID
@@ -133,7 +138,7 @@ void opticflow_avoider_guided_init(void)
   chooseRandomIncrementAvoidance();
 
   // bind our colorfilter callbacks to receive the color filter outputs
-  // AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
+  AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
   // AbiBindMsgVISUAL_DETECTION(FLOOR_VISUAL_DETECTION_ID, &floor_detection_ev, floor_detection_cb);
   AbiBindMsgOPTICAL_FLOW(FLOW_OPTICFLOW_ID, &opticflow_detection_ev, opticflow_detection_cb);
 }
@@ -263,13 +268,22 @@ void opticflow_avoider_guided_periodic(void)
   float speed_sp = fminf(oag_max_speed, 2.0f / (left_intensity + right_intensity) * k_vel);
   VERBOSE_PRINT("left after filter = %f\n", left_intensity);
   VERBOSE_PRINT("right after filter = %f\n", right_intensity);
+  printf("color count after filtering:  %d\n", color_count);
   printf("current state: %d\n", navigation_state);
   switch (navigation_state){
     case SAFE:
-      // if (floor_count < floor_count_threshold || fabsf(floor_centroid_frac) > 0.12){
-      //   navigation_state = OUT_OF_BOUNDS;
+      // if (floor_count < floor_count_threshold || fabsf(floor_centroid_frac) > 0.12){ // ? the reason for the fabsf(floor_centroid_frac) > 0.12?
+      //   navigation_state = OUT_OF_BOUNDS; 
       // } else
-      if ((left_intensity + right_intensity)/2.0f >= opticflow_free_space_threshold){
+      if (color_count < color_count_threshold) {
+        navigation_state = OUT_OF_BOUNDS; 
+        yaw_before_rotate = stateGetNedToBodyEulers_f()->psi;
+        guidance_h_set_body_vel(0, 0);
+        // guidance_h_set_heading(yaw_before_rotate + 3.14159f);
+        chooseRandomIncrementAvoidance();
+        guidance_h_set_heading_rate(avoidance_heading_direction * oag_heading_rate);
+      }
+      else if ((left_intensity + right_intensity)/2.0f >= opticflow_free_space_threshold){
         navigation_state = OBSTACLE_FOUND;
       } else {
         // option 1: when free fly forward, face obstacles then change yaw
@@ -298,29 +312,33 @@ void opticflow_avoider_guided_periodic(void)
         navigation_state = SAFE;
       }
       break;
-    // case OUT_OF_BOUNDS:
-    //   // stop
-    //   guidance_h_set_body_vel(0, 0);
+    case OUT_OF_BOUNDS:
+      // stop
+      // guidance_h_set_body_vel(0, 0);
 
-    //   // start turn back into arena
-    //   guidance_h_set_heading_rate(avoidance_heading_direction * RadOfDeg(15));
+      // start turn back into arena
+      // guidance_h_set_heading_rate(avoidance_heading_direction * RadOfDeg(15));
+      
+      // guidance_h_set_heading(yaw_before_rotate + 3.14159f/2.0f);
+      if (abs(stateGetNedToBodyEulers_f()->psi - yaw_before_rotate) < RadOfDeg(5)) {
+        navigation_state = REENTER_ARENA;
+      }
+      break;
+    case REENTER_ARENA:
+      guidance_h_set_body_vel(oag_max_speed, 0); 
+      // force floor center to opposite side of turn to head back into arena
+      // if (floor_count >= floor_count_threshold && avoidance_heading_direction * floor_centroid_frac >= 0.f){
+      if (color_count >= color_count_threshold){ // TODO: larger threshold than color_count_threshold?
+        // return to heading mode
+        guidance_h_set_heading(stateGetNedToBodyEulers_f()->psi);
 
-    //   navigation_state = REENTER_ARENA;
+        // reset safe counter
+        // obstacle_free_confidence = 0;
 
-    //   break;
-    // case REENTER_ARENA:
-    //   // force floor center to opposite side of turn to head back into arena
-    //   if (floor_count >= floor_count_threshold && avoidance_heading_direction * floor_centroid_frac >= 0.f){
-    //     // return to heading mode
-    //     guidance_h_set_heading(stateGetNedToBodyEulers_f()->psi);
-
-    //     // reset safe counter
-    //     obstacle_free_confidence = 0;
-
-    //     // ensure direction is safe before continuing
-    //     navigation_state = SAFE;
-    //   }
-    //   break;
+        // ensure direction is safe before continuing
+        navigation_state = SAFE;
+      }
+      break;
     default:
       break;
   }

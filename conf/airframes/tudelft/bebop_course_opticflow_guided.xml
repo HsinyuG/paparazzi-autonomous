@@ -80,13 +80,14 @@
       <define name="OPTICFLOW_SEARCH_DISTANCE" value="40"/>
     </module>
     <module name="cv_detect_color_object">
-      <define name="COLOR_OBJECT_DETECTOR_CAMERA1" value="front_camera"/>
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CAMERA1" value="front_camera"/> -->
+      <define name="COLOR_OBJECT_DETECTOR_CAMERA1" value="bottom_camera"/>
       <define name="COLOR_OBJECT_DETECTOR_FPS1" value="0"/>
       <define name="COLOR_OBJECT_DETECTOR_DRAW1" value="1"/>
-      
-      <define name="COLOR_OBJECT_DETECTOR_CAMERA2" value="front_camera"/>
-      <define name="COLOR_OBJECT_DETECTOR_FPS2" value="0"/>
-      <define name="COLOR_OBJECT_DETECTOR_DRAW2" value="1"/>
+
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CAMERA2" value="front_camera"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_FPS2" value="0"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_DRAW2" value="1"/> -->
     </module>
     <module name="orange_avoider_guided">
       <define name="ORANGE_AVOIDER_VISUAL_DETECTION_ID" value="COLOR_OBJECT_DETECTION1_ID"/>

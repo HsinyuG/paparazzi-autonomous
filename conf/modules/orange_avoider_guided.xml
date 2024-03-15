@@ -22,6 +22,7 @@ define which filter to use.
     </description>
     <define name="ORANGE_AVOIDER_VISUAL_DETECTION_ID" value="ABI_BROADCAST" description="which VISUAL_DETECTION message to recieve for orange pole detection."/>
     <define name="FLOOR_VISUAL_DETECTION_ID" value="ABI_BROADCAST" description="which VISUAL_DETECTION message to recieve for floor detection."/>
+    <!-- <define name="K_LPF_BOTTOM_DEFAULT" value="0.6"/> -->
   </doc>
   <settings>
     <dl_settings>
@@ -33,6 +34,10 @@ define which filter to use.
          <dl_setting var="k_vel" min="0" step="0.05" max="50"/>
          <dl_setting var="k_lpf" min="0" step="0.05" max="1"/>
          <dl_setting var="opticflow_free_space_threshold" min="5" step="0.5" max="50"/>
+         <dl_setting var="color_count_threshold" min="-1" step="1" max="1000"/>
+         <dl_setting var="k_lpf_bottom" min="0" step="0.05" max="1">
+          <!-- <strip_button name="default" value="0.6" group="dash_loiter"/> -->
+         </dl_setting>
       </dl_settings>
     </dl_settings>
   </settings>

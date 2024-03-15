@@ -53,12 +53,12 @@ static pthread_mutex_t mutex;
 #endif
 
 // Filter Settings
-uint8_t cod_lum_min1 = 0;
-uint8_t cod_lum_max1 = 0;
+uint8_t cod_lum_min1 = 50; // 110
+uint8_t cod_lum_max1 = 200;
 uint8_t cod_cb_min1 = 0;
-uint8_t cod_cb_max1 = 0;
+uint8_t cod_cb_max1 = 120;
 uint8_t cod_cr_min1 = 0;
-uint8_t cod_cr_max1 = 0;
+uint8_t cod_cr_max1 = 120;
 
 uint8_t cod_lum_min2 = 0;
 uint8_t cod_lum_max2 = 0;
@@ -156,33 +156,33 @@ void color_object_detector_init(void)
   memset(global_filters, 0, 2*sizeof(struct color_object_t));
   pthread_mutex_init(&mutex, NULL);
 #ifdef COLOR_OBJECT_DETECTOR_CAMERA1
-#ifdef COLOR_OBJECT_DETECTOR_LUM_MIN1
-  cod_lum_min1 = COLOR_OBJECT_DETECTOR_LUM_MIN1;
-  cod_lum_max1 = COLOR_OBJECT_DETECTOR_LUM_MAX1;
-  cod_cb_min1 = COLOR_OBJECT_DETECTOR_CB_MIN1;
-  cod_cb_max1 = COLOR_OBJECT_DETECTOR_CB_MAX1;
-  cod_cr_min1 = COLOR_OBJECT_DETECTOR_CR_MIN1;
-  cod_cr_max1 = COLOR_OBJECT_DETECTOR_CR_MAX1;
-#endif
-#ifdef COLOR_OBJECT_DETECTOR_DRAW1
-  cod_draw1 = COLOR_OBJECT_DETECTOR_DRAW1;
-#endif
+// #ifdef COLOR_OBJECT_DETECTOR_LUM_MIN1
+//   cod_lum_min1 = COLOR_OBJECT_DETECTOR_LUM_MIN1;
+//   cod_lum_max1 = COLOR_OBJECT_DETECTOR_LUM_MAX1;
+//   cod_cb_min1 = COLOR_OBJECT_DETECTOR_CB_MIN1;
+//   cod_cb_max1 = COLOR_OBJECT_DETECTOR_CB_MAX1;
+//   cod_cr_min1 = COLOR_OBJECT_DETECTOR_CR_MIN1;
+//   cod_cr_max1 = COLOR_OBJECT_DETECTOR_CR_MAX1;
+// #endif
+// #ifdef COLOR_OBJECT_DETECTOR_DRAW1
+//   cod_draw1 = COLOR_OBJECT_DETECTOR_DRAW1;
+// #endif
 
   cv_add_to_device(&COLOR_OBJECT_DETECTOR_CAMERA1, object_detector1, COLOR_OBJECT_DETECTOR_FPS1, 0);
 #endif
 
 #ifdef COLOR_OBJECT_DETECTOR_CAMERA2
-#ifdef COLOR_OBJECT_DETECTOR_LUM_MIN2
-  cod_lum_min2 = COLOR_OBJECT_DETECTOR_LUM_MIN2;
-  cod_lum_max2 = COLOR_OBJECT_DETECTOR_LUM_MAX2;
-  cod_cb_min2 = COLOR_OBJECT_DETECTOR_CB_MIN2;
-  cod_cb_max2 = COLOR_OBJECT_DETECTOR_CB_MAX2;
-  cod_cr_min2 = COLOR_OBJECT_DETECTOR_CR_MIN2;
-  cod_cr_max2 = COLOR_OBJECT_DETECTOR_CR_MAX2;
-#endif
-#ifdef COLOR_OBJECT_DETECTOR_DRAW2
-  cod_draw2 = COLOR_OBJECT_DETECTOR_DRAW2;
-#endif
+// #ifdef COLOR_OBJECT_DETECTOR_LUM_MIN2
+//   cod_lum_min2 = COLOR_OBJECT_DETECTOR_LUM_MIN2;
+//   cod_lum_max2 = COLOR_OBJECT_DETECTOR_LUM_MAX2;
+//   cod_cb_min2 = COLOR_OBJECT_DETECTOR_CB_MIN2;
+//   cod_cb_max2 = COLOR_OBJECT_DETECTOR_CB_MAX2;
+//   cod_cr_min2 = COLOR_OBJECT_DETECTOR_CR_MIN2;
+//   cod_cr_max2 = COLOR_OBJECT_DETECTOR_CR_MAX2;
+// #endif
+// #ifdef COLOR_OBJECT_DETECTOR_DRAW2
+//   cod_draw2 = COLOR_OBJECT_DETECTOR_DRAW2;
+// #endif
 
   cv_add_to_device(&COLOR_OBJECT_DETECTOR_CAMERA2, object_detector2, COLOR_OBJECT_DETECTOR_FPS2, 1);
 #endif

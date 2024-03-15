@@ -42,6 +42,8 @@ extern float k_vel;
 // extern float k_psi;
 extern float k_lpf;
 extern float opticflow_free_space_threshold;
+extern float color_count_threshold;
+extern float k_lpf_bottom;
 
 
 extern void orange_avoider_guided_init(void);
