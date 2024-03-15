@@ -52,6 +52,16 @@ static pthread_mutex_t mutex;
 #define COLOR_OBJECT_DETECTOR_FPS2 0 ///< Default FPS (zero means run at camera fps)
 #endif
 
+#ifndef ACTION_FORWARD 0
+#define ACTION_FORWARD 0
+#endif
+#ifndef ACTION_LEFT 1
+#define ACTION_LEFT 1
+#endif
+#ifndef ACTION_RIGHT 2
+#define ACTION_RIGHT 2
+#endif
+
 // Filter Settings
 uint8_t cod_lum_min1 = 0;
 uint8_t cod_lum_max1 = 0;
@@ -59,6 +69,7 @@ uint8_t cod_cb_min1 = 0;
 uint8_t cod_cb_max1 = 0;
 uint8_t cod_cr_min1 = 0;
 uint8_t cod_cr_max1 = 0;
+uint8_t cod_bottom_height1 = 80;
 
 uint8_t cod_lum_min2 = 0;
 uint8_t cod_lum_max2 = 0;
@@ -66,6 +77,7 @@ uint8_t cod_cb_min2 = 0;
 uint8_t cod_cb_max2 = 0;
 uint8_t cod_cr_min2 = 0;
 uint8_t cod_cr_max2 = 0;
+uint8_t cod_bottom_height2 = 80;
 
 bool cod_draw1 = false;
 bool cod_draw2 = false;
@@ -74,16 +86,18 @@ bool cod_draw2 = false;
 struct color_object_t {
   int32_t x_c;
   int32_t y_c;
-  uint32_t color_count;
+  uint32_t action_count;
   bool updated;
 };
 struct color_object_t global_filters[2];
 
 // Function
-uint32_t find_object_centroid(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool draw,
+uint8_t* find_object_counts(struct image_t *img, bool draw,
+                              int32_t* left_count, int32_t* middle_count, int32_t* right_count,
                               uint8_t lum_min, uint8_t lum_max,
                               uint8_t cb_min, uint8_t cb_max,
-                              uint8_t cr_min, uint8_t cr_max);
+                              uint8_t cr_min, uint8_t cr_max,
+                              uint8_t bottom_height);
 
 /*
  * object_detector
@@ -96,6 +110,7 @@ static struct image_t *object_detector(struct image_t *img, uint8_t filter)
   uint8_t lum_min, lum_max;
   uint8_t cb_min, cb_max;
   uint8_t cr_min, cr_max;
+  uint8_t bottom_height;
   bool draw;
 
   switch (filter){
@@ -106,6 +121,7 @@ static struct image_t *object_detector(struct image_t *img, uint8_t filter)
       cb_max = cod_cb_max1;
       cr_min = cod_cr_min1;
       cr_max = cod_cr_max1;
+      bottom_height = cod_bottom_height1;
       draw = cod_draw1;
       break;
     case 2:
@@ -115,24 +131,37 @@ static struct image_t *object_detector(struct image_t *img, uint8_t filter)
       cb_max = cod_cb_max2;
       cr_min = cod_cr_min2;
       cr_max = cod_cr_max2;
+      bottom_height = cod_bottom_height2;
       draw = cod_draw2;
       break;
     default:
       return img;
   };
 
-  int32_t x_c, y_c;
-
+  uint32_t count_left, count_middle, count_right;
   // Filter and find centroid
-  uint32_t count = find_object_centroid(img, &x_c, &y_c, draw, lum_min, lum_max, cb_min, cb_max, cr_min, cr_max);
+  uint8_t count_rows = find_object_counts(
+    img, draw, &count_left, &count_middle, &count_right,
+    lum_min, lum_max, cb_min, cb_max, cr_min, cr_max, bottom_height);
   VERBOSE_PRINT("Color count %d: %u, threshold %u, x_c %d, y_c %d\n", camera, object_count, count_threshold, x_c, y_c);
   VERBOSE_PRINT("centroid %d: (%d, %d) r: %4.2f a: %4.2f\n", camera, x_c, y_c,
         hypotf(x_c, y_c) / hypotf(img->w * 0.5, img->h * 0.5), RadOfDeg(atan2f(y_c, x_c)));
 
   pthread_mutex_lock(&mutex);
-  global_filters[filter-1].color_count = count;
+  //global_filters[filter-1].color_count = count;
+
+  if (count_left > count_middle && count_left > count_right) {
+    global_filters[filter-1].action_count = ACTION_LEFT;
+  } else if (count_middle > count_left && count_middle > count_right) {
+    global_filters[filter-1].action_count = ACTION_FORWARD;
+  } else {
+    global_filters[filter-1].action_count = ACTION_RIGHT;
+  }
+
+  /*
   global_filters[filter-1].x_c = x_c;
   global_filters[filter-1].y_c = y_c;
+  */
   global_filters[filter-1].updated = true;
   pthread_mutex_unlock(&mutex);
 
@@ -163,6 +192,7 @@ void color_object_detector_init(void)
   cod_cb_max1 = COLOR_OBJECT_DETECTOR_CB_MAX1;
   cod_cr_min1 = COLOR_OBJECT_DETECTOR_CR_MIN1;
   cod_cr_max1 = COLOR_OBJECT_DETECTOR_CR_MAX1;
+  cod_bottom_height1 = COLOR_OBJECT_DETECTOR_BOTTOM_HEIGHT1;
 #endif
 #ifdef COLOR_OBJECT_DETECTOR_DRAW1
   cod_draw1 = COLOR_OBJECT_DETECTOR_DRAW1;
@@ -179,6 +209,7 @@ void color_object_detector_init(void)
   cod_cb_max2 = COLOR_OBJECT_DETECTOR_CB_MAX2;
   cod_cr_min2 = COLOR_OBJECT_DETECTOR_CR_MIN2;
   cod_cr_max2 = COLOR_OBJECT_DETECTOR_CR_MAX2;
+  cod_bottom_height2 = COLOR_OBJECT_DETECTOR_BOTTOM_HEIGHT2;
 #endif
 #ifdef COLOR_OBJECT_DETECTOR_DRAW2
   cod_draw2 = COLOR_OBJECT_DETECTOR_DRAW2;
@@ -206,19 +237,23 @@ void color_object_detector_init(void)
  * @param draw - whether or not to draw on image
  * @return number of pixels of image within the filter bounds.
  */
-uint32_t find_object_centroid(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool draw,
+uint8_t* find_object_counts(struct image_t *img, bool draw,
+                              int32_t* left_count, int32_t* middle_count, int32_t* right_count,
                               uint8_t lum_min, uint8_t lum_max,
                               uint8_t cb_min, uint8_t cb_max,
-                              uint8_t cr_min, uint8_t cr_max)
+                              uint8_t cr_min, uint8_t cr_max,
+                              uint8_t bottom_height)
 {
   uint32_t cnt = 0;
   uint32_t tot_x = 0;
   uint32_t tot_y = 0;
   uint8_t *buffer = img->buf;
+  uint8_t *count_rows = malloc(img->h * sizeof(uint8_t));
 
   // Go through all the pixels
   for (uint16_t y = 0; y < img->h; y++) {
-    for (uint16_t x = 0; x < img->w; x ++) {
+    uint8_t count_row = 0;
+    for (uint16_t x = 0; x < bottom_height; x ++) {
       // Check if the color is inside the specified values
       uint8_t *yp, *up, *vp;
       if (x % 2 == 0) {
@@ -237,15 +272,27 @@ uint32_t find_object_centroid(struct image_t *img, int32_t* p_xc, int32_t* p_yc,
       if ( (*yp >= lum_min) && (*yp <= lum_max) &&
            (*up >= cb_min ) && (*up <= cb_max ) &&
            (*vp >= cr_min ) && (*vp <= cr_max )) {
+        count_row ++;
         cnt ++;
         tot_x += x;
         tot_y += y;
+
+        if (x < img->w / 3) {
+          *left_count += 1;
+        } else if (x < 2 * img->w / 3) {
+          *middle_count += 1;
+        } else {
+          *right_count += 1;
+        }
+
         if (draw){
           *yp = 255;  // make pixel brighter in image
         }
       }
     }
+    count_rows[y] = count_row;
   }
+  /*
   if (cnt > 0) {
     *p_xc = (int32_t)roundf(tot_x / ((float) cnt) - img->w * 0.5f);
     *p_yc = (int32_t)roundf(img->h * 0.5f - tot_y / ((float) cnt));
@@ -253,7 +300,8 @@ uint32_t find_object_centroid(struct image_t *img, int32_t* p_xc, int32_t* p_yc,
     *p_xc = 0;
     *p_yc = 0;
   }
-  return cnt;
+  */
+  return count_rows;
 }
 
 void color_object_detector_periodic(void)
@@ -264,13 +312,13 @@ void color_object_detector_periodic(void)
   pthread_mutex_unlock(&mutex);
 
   if(local_filters[0].updated){
-    AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION1_ID, local_filters[0].x_c, local_filters[0].y_c,
-        0, 0, local_filters[0].color_count, 0);
+    AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION1_ID, 0, 0,
+        0, 0, local_filters[0].action_count, 0);
     local_filters[0].updated = false;
   }
   if(local_filters[1].updated){
-    AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION2_ID, local_filters[1].x_c, local_filters[1].y_c,
-        0, 0, local_filters[1].color_count, 1);
+    AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION2_ID, 0, 0,
+        0, 0, local_filters[1].action_count, 1);
     local_filters[1].updated = false;
   }
 }
