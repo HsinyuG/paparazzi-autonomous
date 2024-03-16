@@ -52,14 +52,20 @@ static pthread_mutex_t mutex;
 #define COLOR_OBJECT_DETECTOR_FPS2 0 ///< Default FPS (zero means run at camera fps)
 #endif
 
-#ifndef ACTION_FORWARD 0
-#define ACTION_FORWARD 0
+#ifndef ACTION_LEFT
+#define ACTION_LEFT 0
 #endif
-#ifndef ACTION_LEFT 1
-#define ACTION_LEFT 1
+#ifndef ACTION_FORWARD_LEFT
+#define ACTION_FORWARD_LEFT 1
 #endif
-#ifndef ACTION_RIGHT 2
-#define ACTION_RIGHT 2
+#ifndef ACTION_FORWARD
+#define ACTION_FORWARD 2
+#endif
+#ifndef ACTION_FORWARD_RIGHT
+#define ACTION_FORWARD_RIGHT 3
+#endif
+#ifndef ACTION_RIGHT
+#define ACTION_RIGHT 4
 #endif
 
 // Filter Settings
@@ -150,12 +156,32 @@ static struct image_t *object_detector(struct image_t *img, uint8_t filter)
   pthread_mutex_lock(&mutex);
   //global_filters[filter-1].color_count = count;
 
-  if (count_left > count_middle && count_left > count_right) {
-    global_filters[filter-1].action_count = ACTION_LEFT;
-  } else if (count_middle > count_left && count_middle > count_right) {
-    global_filters[filter-1].action_count = ACTION_FORWARD;
-  } else {
-    global_filters[filter-1].action_count = ACTION_RIGHT;
+  uint32_t green_threshold = 0.5 * img->h/3 * bottom_height;
+  if (count_middle < green_threshold)
+  {
+    if (count_left > count_right)
+    {
+      global_filters[filter-1].action_count = ACTION_LEFT;
+    }
+    else
+    {
+      global_filters[filter-1].action_count = ACTION_RIGHT;
+    }
+  }
+  else
+  {
+    if (count_left > count_right && count_left > count_middle)
+    {
+      global_filters[filter-1].action_count = ACTION_FORWARD_LEFT;
+    }
+    else if (count_right > count_left && count_right > count_middle)
+    {
+      global_filters[filter-1].action_count = ACTION_FORWARD_RIGHT;
+    }
+    else
+    {
+      global_filters[filter-1].action_count = ACTION_FORWARD;
+    }
   }
 
   /*
