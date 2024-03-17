@@ -79,6 +79,9 @@ struct edge_t global_filters[2];
 
 // Function
 void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, float sigma, float tlow, float thigh);
+uint16_t median_filter(uint16_t *array, uint16_t length);
+void compare (const void * a, const void * b);
+
 
 unsigned char * YUV2Gray(struct image_t *img);
 
@@ -217,6 +220,23 @@ unsigned char * YUV2Gray(struct image_t *img)
 }
 
 
+uint16_t median_filter(uint16_t *array, uint16_t length)
+{
+  uint16_t *array_sorted = (uint16_t *)malloc(length * sizeof(uint16_t));
+  memcpy(array_sorted, array, length * sizeof(uint16_t));
+  qsort(array_sorted, length, sizeof(uint16_t), compare);
+  uint16_t median = array_sorted[length/2];
+  free(array_sorted);
+  return median;
+}
+
+void compare (const void * a, const void * b)
+{
+  return ( *(int*)a - *(int*)b );
+}
+
+// best params - 3, 0.5, 0.95
+
 void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, float sigma, float tlow, float thigh)
 {
   uint8_t *buffer = img->buf;
@@ -283,28 +303,32 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
   
   // find the column with highest free space from bottom
   uint16_t row_with_largest_space = rows/2;
-  int16_t largest_first_edge_x = -1; // max x is < 255 so okay
+  int16_t longest_edge_length = -1; // max x is < 255 so okay, longest from botton to top - 240 pixels
   printf("cols: %d,", cols);
 
   // median filtering, find the largest space
   for (uint32_t i=1; i<rows-1; i++) {
-    first_edge_x_each_row_filtered[i-1] = (first_edge_x_each_row[i-1] + first_edge_x_each_row[i] + first_edge_x_each_row[i+1])/3;
+    // first_edge_x_each_row_filtered[i-1] = (first_edge_x_each_row[i-1] + first_edge_x_each_row[i] + first_edge_x_each_row[i+1])/3;
+    uint16_t edge_array[3] = {first_edge_x_each_row[i-1], first_edge_x_each_row[i], first_edge_x_each_row[i+1]};
+    first_edge_x_each_row_filtered[i-1] = median_filter(edge_array, 3);
+    // printf("median: %u, ", first_edge_x_each_row_filtered[i-1]);
     // printf("%u: %u, ", i-1, first_edge_x_each_row_filtered[i-1]);
-    if (first_edge_x_each_row_filtered[i-1] > largest_first_edge_x) {
-      largest_first_edge_x = first_edge_x_each_row_filtered[i-1];
+    if (first_edge_x_each_row_filtered[i-1] > longest_edge_length) {
+      longest_edge_length = first_edge_x_each_row_filtered[i-1];
       row_with_largest_space = i;
     }
   } 
-  if (largest_first_edge_x == -1) {largest_first_edge_x = cols;}
+  if (longest_edge_length == -1) {longest_edge_length = cols;}
   // TODO: sliding window
   // buffer[least_first_edge_y * 2 * cols + 2 * highest_column_x - 2] = -37.52415; // U
   // buffer[least_first_edge_y * 2 * cols + 2 * highest_column_x] = 157.27575;     // V
   // buffer[least_first_edge_y * 2 * cols + 2 * highest_column_x + 1] = 76.245;    // Y
   printf("free direction: %u, ", row_with_largest_space);
+  printf("free space: %u, ", longest_edge_length);
   printf("in 0 - %u\n", rows);
   free(first_edge_x_each_row);
   free(first_edge_x_each_row_filtered);
-  local_filter_ptr->first_edge_height = largest_first_edge_x;
+  local_filter_ptr->first_edge_height = longest_edge_length;
   local_filter_ptr->higest_column_idx = row_with_largest_space;
   return;
 }
