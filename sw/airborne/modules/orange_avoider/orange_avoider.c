@@ -59,6 +59,7 @@ int32_t color_count = 0;                // orange color count from color filter 
 int16_t obstacle_free_confidence = 0;   // a measure of how certain we are that the way ahead is safe.
 float heading_increment = 5.f;          // heading angle increment [deg]
 float maxDistance = 2.25;               // max waypoint displacement [m]
+int32_t green_tracker_direction = 0;    //initial direction(ACTION_FORWARD)
 
 const int16_t max_trajectory_confidence = 5; // number of consecutive negative object detections to be sure we are obstacle free
 
@@ -78,7 +79,7 @@ static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
                                int16_t __attribute__((unused)) pixel_width, int16_t __attribute__((unused)) pixel_height,
                                int32_t quality, int16_t __attribute__((unused)) extra)
 {
-  color_count = quality;
+  green_tracker_direction = quality;
 }
 
 /*
@@ -93,7 +94,17 @@ void orange_avoider_init(void)
   // bind our colorfilter callbacks to receive the color filter outputs
   AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
 }
+// SOMETHING CHANGJUN ADDED
+void green_tracker_init(void)
+{
+  // Initialise random values
+  srand(time(NULL));
+  chooseRandomIncrementAvoidance();
 
+  // bind our colorfilter callbacks to receive the color filter outputs
+  AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
+}
+//END of CHANGJUN ADDED PART 
 /*
  * Function that checks it is safe to move forwards, and then moves a waypoint forward or changes the heading
  */
@@ -173,7 +184,92 @@ void orange_avoider_periodic(void)
   }
   return;
 }
+// SOMETHING CHANGJUN ADDED
+void green_tracker_periodic(void)
+{
+  // only evaluate our state machine if we are flying
+  if(!autopilot_in_flight()){
+    return;
+  }
+  // If(green_tracker_direction = 2){
+  //   navigation_state = SAFE;
+  // }
 
+  float moveDistance = maxDistance;
+  switch (navigation_state){
+    case SAFE:
+      // Move waypoint forward
+      moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance);
+      if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
+        navigation_state = OUT_OF_BOUNDS;
+      } else if (green_tracker_direction != ACTION_FORWARD){
+        navigation_state = OBSTACLE_FOUND;
+      } else {
+        moveWaypointForward(WP_GOAL, moveDistance);
+      }
+
+      break;
+    case OBSTACLE_FOUND:
+      // stop
+      waypoint_move_here_2d(WP_GOAL);
+      waypoint_move_here_2d(WP_TRAJECTORY);
+      // Obstacle_found then change yaw velocity:
+      switch (green_tracker_direction)
+      {
+        case ACTION_LEFT:
+          heading_increment = 10.0f;
+          break;
+        case ACTION_RIGHT:
+          heading_increment = -10.0f;
+          break;
+        case ACTION_FORWARD_LEFT:
+          heading_increment = 5.0f;
+          break;
+        case ACTION_FORWARD_RIGHT:
+          heading_increment = -5.0f;
+          break;
+        default:
+          break;
+      }
+      // // randomly select new search direction
+      // chooseRandomIncrementAvoidance();
+
+      navigation_state = SEARCH_FOR_SAFE_HEADING;
+
+      break;
+    case SEARCH_FOR_SAFE_HEADING:
+      increase_nav_heading(heading_increment);
+
+      // make sure we have a couple of good readings before declaring the way safe
+      // if (obstacle_free_confidence >= 2){
+      //   navigation_state = SAFE;
+      if (green_tracker_direction == ACTION_FORWARD){
+        navigation_state = SAFE;
+      }
+      break;
+    case OUT_OF_BOUNDS:
+      chooseRandomIncrementAvoidance();
+      increase_nav_heading(heading_increment);
+      moveWaypointForward(WP_TRAJECTORY, 1.5f);
+
+      if (InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
+        // add offset to head back into arena
+        increase_nav_heading(heading_increment);
+
+        // reset safe counter
+        // obstacle_free_confidence = 0;
+
+        // ensure direction is safe before continuing
+        navigation_state = SEARCH_FOR_SAFE_HEADING;
+      }
+      break;
+    default:
+      break;
+  }
+  return;
+  
+}
+//END of CHANGJUN ADDED PART 
 /*
  * Increases the NAV heading. Assumes heading is an INT32_ANGLE. It is bound in this function.
  */
@@ -190,6 +286,7 @@ uint8_t increase_nav_heading(float incrementDegrees)
   VERBOSE_PRINT("Increasing heading to %f\n", DegOfRad(new_heading));
   return false;
 }
+
 
 /*
  * Calculates coordinates of distance forward and sets waypoint 'waypoint' to those coordinates

@@ -52,21 +52,7 @@ static pthread_mutex_t mutex;
 #define COLOR_OBJECT_DETECTOR_FPS2 0 ///< Default FPS (zero means run at camera fps)
 #endif
 
-#ifndef ACTION_LEFT
-#define ACTION_LEFT 0
-#endif
-#ifndef ACTION_FORWARD_LEFT
-#define ACTION_FORWARD_LEFT 1
-#endif
-#ifndef ACTION_FORWARD
-#define ACTION_FORWARD 2
-#endif
-#ifndef ACTION_FORWARD_RIGHT
-#define ACTION_FORWARD_RIGHT 3
-#endif
-#ifndef ACTION_RIGHT
-#define ACTION_RIGHT 4
-#endif
+
 
 // Filter Settings
 uint8_t cod_lum_min1 = 0;
@@ -98,8 +84,8 @@ struct color_object_t {
 struct color_object_t global_filters[2];
 
 // Function
-uint8_t* find_object_counts(struct image_t *img, bool draw,
-                              int32_t* left_count, int32_t* middle_count, int32_t* right_count,
+void find_object_counts(struct image_t *img, bool draw,
+                              uint32_t* left_count, uint32_t* middle_count, uint32_t* right_count,
                               uint8_t lum_min, uint8_t lum_max,
                               uint8_t cb_min, uint8_t cb_max,
                               uint8_t cr_min, uint8_t cr_max,
@@ -146,7 +132,7 @@ static struct image_t *object_detector(struct image_t *img, uint8_t filter)
 
   uint32_t count_left, count_middle, count_right;
   // Filter and find centroid
-  uint8_t count_rows = find_object_counts(
+  find_object_counts(
     img, draw, &count_left, &count_middle, &count_right,
     lum_min, lum_max, cb_min, cb_max, cr_min, cr_max, bottom_height);
   VERBOSE_PRINT("Color count %d: %u, threshold %u, x_c %d, y_c %d\n", camera, object_count, count_threshold, x_c, y_c);
@@ -263,8 +249,8 @@ void color_object_detector_init(void)
  * @param draw - whether or not to draw on image
  * @return number of pixels of image within the filter bounds.
  */
-uint8_t* find_object_counts(struct image_t *img, bool draw,
-                              int32_t* left_count, int32_t* middle_count, int32_t* right_count,
+void find_object_counts(struct image_t *img, bool draw,
+                              uint32_t* left_count, uint32_t* middle_count, uint32_t* right_count,
                               uint8_t lum_min, uint8_t lum_max,
                               uint8_t cb_min, uint8_t cb_max,
                               uint8_t cr_min, uint8_t cr_max,
@@ -274,7 +260,7 @@ uint8_t* find_object_counts(struct image_t *img, bool draw,
   uint32_t tot_x = 0;
   uint32_t tot_y = 0;
   uint8_t *buffer = img->buf;
-  uint8_t *count_rows = malloc(img->h * sizeof(uint8_t));
+  // uint8_t *count_rows = malloc(img->h * sizeof(uint8_t));
 
   // Go through all the pixels
   for (uint16_t y = 0; y < img->h; y++) {
@@ -316,7 +302,7 @@ uint8_t* find_object_counts(struct image_t *img, bool draw,
         }
       }
     }
-    count_rows[y] = count_row;
+    // count_rows[y] = count_row;
   }
   /*
   if (cnt > 0) {
@@ -327,7 +313,8 @@ uint8_t* find_object_counts(struct image_t *img, bool draw,
     *p_yc = 0;
   }
   */
-  return count_rows;
+  // return count_rows;
+  return;
 }
 
 void color_object_detector_periodic(void)
