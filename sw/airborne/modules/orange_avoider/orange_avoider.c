@@ -59,7 +59,9 @@ int32_t color_count = 0;                // orange color count from color filter 
 int16_t obstacle_free_confidence = 0;   // a measure of how certain we are that the way ahead is safe.
 float heading_increment = 5.f;          // heading angle increment [deg]
 float maxDistance = 2.25;               // max waypoint displacement [m]
-int32_t green_tracker_direction = 0;    //initial direction(ACTION_FORWARD)
+int32_t green_tracker_direction = ACTION_FORWARD;    //initial direction(ACTION_FORWARD)
+int32_t green_detect_result = ACTION_FORWARD;
+int32_t degree_to_rotate = 0;
 
 const int16_t max_trajectory_confidence = 5; // number of consecutive negative object detections to be sure we are obstacle free
 
@@ -79,7 +81,7 @@ static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
                                int16_t __attribute__((unused)) pixel_width, int16_t __attribute__((unused)) pixel_height,
                                int32_t quality, int16_t __attribute__((unused)) extra)
 {
-  green_tracker_direction = quality;
+  green_detect_result = quality;
 }
 
 /*
@@ -191,18 +193,21 @@ void green_tracker_periodic(void)
   if(!autopilot_in_flight()){
     return;
   }
-  // If(green_tracker_direction = 2){
-  //   navigation_state = SAFE;
-  // }
-
-  float moveDistance = maxDistance;
+  printf("current state: %d\n", navigation_state);
+  printf("current command: %d\n", green_tracker_direction);
+  float moveDistance = maxDistance / 2.0f;
   switch (navigation_state){
     case SAFE:
       // Move waypoint forward
-      moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance);
+      moveWaypointForward(WP_TRAJECTORY, moveDistance); // 1.5f *  ; 0.75f + 
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
+        chooseRandomIncrementAvoidance();
+        // green_tracker_direction = green_detect_result;
         navigation_state = OUT_OF_BOUNDS;
-      } else if (green_tracker_direction != ACTION_FORWARD){
+      } else 
+      if (green_tracker_direction != ACTION_FORWARD){
+        green_tracker_direction = green_detect_result;
+
         navigation_state = OBSTACLE_FOUND;
       } else {
         moveWaypointForward(WP_GOAL, moveDistance);
@@ -237,7 +242,7 @@ void green_tracker_periodic(void)
       navigation_state = SEARCH_FOR_SAFE_HEADING;
 
       break;
-    case SEARCH_FOR_SAFE_HEADING:
+    case SEARCH_FOR_SAFE_HEADING: // continue on certain direction to turn, to prevent conflict direction in OBSTACLE_FOUND after OUT_OF_BOUNDS
       increase_nav_heading(heading_increment);
 
       // make sure we have a couple of good readings before declaring the way safe
@@ -247,10 +252,14 @@ void green_tracker_periodic(void)
         navigation_state = SAFE;
       }
       break;
-    case OUT_OF_BOUNDS:
-      chooseRandomIncrementAvoidance();
+    case OUT_OF_BOUNDS: // use the detect result to determine the changing direction, to avoid conflic direction with obstacle avoid
+      // stop
+      waypoint_move_here_2d(WP_GOAL);
+      waypoint_move_here_2d(WP_TRAJECTORY);
+
       increase_nav_heading(heading_increment);
-      moveWaypointForward(WP_TRAJECTORY, 1.5f);
+      // moveWaypointForward(WP_TRAJECTORY, 1.5f); // has bug: max distance + 0.75 out of boundary, but this one still in, so immediately jump out
+      moveWaypointForward(WP_TRAJECTORY, 0.75f + moveDistance);
 
       if (InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         // add offset to head back into arena
@@ -262,6 +271,7 @@ void green_tracker_periodic(void)
         // ensure direction is safe before continuing
         navigation_state = SEARCH_FOR_SAFE_HEADING;
       }
+
       break;
     default:
       break;
