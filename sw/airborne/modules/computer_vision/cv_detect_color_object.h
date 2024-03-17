@@ -65,6 +65,9 @@ extern uint8_t cod_bottom_height2;
 extern bool cod_draw1;
 extern bool cod_draw2;
 
+extern float num_parts;
+extern float green_threshold_proportion;
+
 // Module functions
 extern void color_object_detector_init(void);
 extern void color_object_detector_periodic(void);

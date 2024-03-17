@@ -74,6 +74,9 @@ uint8_t cod_bottom_height2 = 80;
 bool cod_draw1 = false;
 bool cod_draw2 = false;
 
+float num_parts = 3.0f;
+float green_threshold_proportion = 0.5f;
+
 // define global variables
 struct color_object_t {
   int32_t x_c;
@@ -130,7 +133,9 @@ static struct image_t *object_detector(struct image_t *img, uint8_t filter)
       return img;
   };
 
-  uint32_t count_left, count_middle, count_right;
+  uint32_t count_left = 0;
+  uint32_t count_middle = 0; // !!! if not initialize again, just define it, it will be very large values, seems use last loop's result
+  uint32_t count_right = 0;
   // Filter and find centroid
   find_object_counts(
     img, draw, &count_left, &count_middle, &count_right,
@@ -142,7 +147,8 @@ static struct image_t *object_detector(struct image_t *img, uint8_t filter)
   pthread_mutex_lock(&mutex);
   //global_filters[filter-1].color_count = count;
 
-  uint32_t green_threshold = 0.5 * img->h/3 * bottom_height;
+  uint32_t green_threshold = green_threshold_proportion * img->h * (1-2/num_parts) * bottom_height;
+  printf("count_middle = %u; green_threshold = %u\n", count_middle, green_threshold);
   if (count_middle < green_threshold)
   {
     if (count_left > count_right)
@@ -262,6 +268,8 @@ void find_object_counts(struct image_t *img, bool draw,
   uint8_t *buffer = img->buf;
   // uint8_t *count_rows = malloc(img->h * sizeof(uint8_t));
 
+  // debug
+  uint64_t loop_count = 0;
   // Go through all the pixels
   for (uint16_t y = 0; y < img->h; y++) {
     uint8_t count_row = 0;
@@ -288,22 +296,29 @@ void find_object_counts(struct image_t *img, bool draw,
         cnt ++;
         tot_x += x;
         tot_y += y;
-
-        if (x < img->w / 3) {
+        // printf("bound1 = %d\n", img->w);
+        // printf("bound2 = %f\n", 1-1/num_parts);
+        // printf("bound3 = %f\n", img->w * (1-1/num_parts));
+        if (x < img->w * (1/num_parts)) {
           *left_count += 1;
-        } else if (x < 2 * img->w / 3) {
-          *middle_count += 1;
-        } else {
+          if (!(loop_count % 10)) {printf("1\n");}
+        } else if (x > img->w * (1-1/num_parts)) {
           *right_count += 1;
+          if (!(loop_count % 10)) {printf("2\n");}
+        } else {
+          *middle_count += 1;
+          if (!(loop_count % 10)) {printf("3\n");}
         }
 
         if (draw){
           *yp = 255;  // make pixel brighter in image
         }
       }
+      loop_count ++;
     }
     // count_rows[y] = count_row;
   }
+  printf("loop_count = %u\n", loop_count);
   /*
   if (cnt > 0) {
     *p_xc = (int32_t)roundf(tot_x / ((float) cnt) - img->w * 0.5f);

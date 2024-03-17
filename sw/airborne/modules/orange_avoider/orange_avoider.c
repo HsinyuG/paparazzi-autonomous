@@ -76,12 +76,22 @@ const int16_t max_trajectory_confidence = 5; // number of consecutive negative o
 #define ORANGE_AVOIDER_VISUAL_DETECTION_ID ABI_BROADCAST
 #endif
 static abi_event color_detection_ev;
+static abi_event green_detection_ev;
 static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
                                int16_t __attribute__((unused)) pixel_x, int16_t __attribute__((unused)) pixel_y,
                                int16_t __attribute__((unused)) pixel_width, int16_t __attribute__((unused)) pixel_height,
                                int32_t quality, int16_t __attribute__((unused)) extra)
 {
   green_detect_result = quality;
+}
+
+static void green_detection_cb(uint8_t __attribute__((unused)) sender_id,
+                               int16_t __attribute__((unused)) pixel_x, int16_t __attribute__((unused)) pixel_y,
+                               int16_t __attribute__((unused)) pixel_width, int16_t __attribute__((unused)) pixel_height,
+                               int32_t quality, int16_t __attribute__((unused)) extra)
+{
+  green_detect_result = quality;
+  // printf("green_detect_result = %d\n", green_detect_result);
 }
 
 /*
@@ -104,7 +114,7 @@ void green_tracker_init(void)
   chooseRandomIncrementAvoidance();
 
   // bind our colorfilter callbacks to receive the color filter outputs
-  AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
+  AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, green_detection_cb);
 }
 //END of CHANGJUN ADDED PART 
 /*
@@ -200,16 +210,18 @@ void green_tracker_periodic(void)
     case SAFE:
       // Move waypoint forward
       moveWaypointForward(WP_TRAJECTORY, moveDistance); // 1.5f *  ; 0.75f + 
-      if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
-        chooseRandomIncrementAvoidance();
-        // green_tracker_direction = green_detect_result;
-        navigation_state = OUT_OF_BOUNDS;
-      } else 
-      if (green_tracker_direction != ACTION_FORWARD){
+
+      if (green_detect_result != ACTION_FORWARD){
         green_tracker_direction = green_detect_result;
 
         navigation_state = OBSTACLE_FOUND;
-      } else {
+      } 
+      else if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
+        chooseRandomIncrementAvoidance();
+        // green_tracker_direction = green_detect_result;
+        navigation_state = OUT_OF_BOUNDS;
+      }  
+      else {
         moveWaypointForward(WP_GOAL, moveDistance);
       }
 
@@ -248,7 +260,7 @@ void green_tracker_periodic(void)
       // make sure we have a couple of good readings before declaring the way safe
       // if (obstacle_free_confidence >= 2){
       //   navigation_state = SAFE;
-      if (green_tracker_direction == ACTION_FORWARD){
+      if (green_detect_result == ACTION_FORWARD){
         navigation_state = SAFE;
       }
       break;
