@@ -53,13 +53,13 @@
   </dep>
 
   <header>
-    <file name="cv_detect_color_object.h"/>
+    <file name="cv_detect_yuv.h"/>
   </header>
 
   <init fun="color_object_detector_init()"/>
   <periodic fun="color_object_detector_periodic()" freq="50"/>
   <makefile target="ap|nps">
-    <file name="cv_detect_color_object.c"/>
+    <file name="cv_detect_yuv.c"/>
   </makefile>
 </module>
 

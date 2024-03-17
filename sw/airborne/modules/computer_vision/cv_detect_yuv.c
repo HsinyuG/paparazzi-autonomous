@@ -76,8 +76,9 @@ struct color_object_t {
   int32_t y_c;
   uint32_t color_count;
   bool updated;
-  uint16_t hue[256];
-  uint16_t intensity[256];
+  uint16_t yd[256];
+  uint16_t ud[256];
+  uint16_t vd[256];
 };
 struct color_object_t global_filters[2];
 
@@ -85,14 +86,12 @@ struct color_object_t global_filters[2];
 uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool draw,
                               uint8_t lum_min, uint8_t lum_max,
                               uint8_t cb_min, uint8_t cb_max,
-                              uint8_t cr_min, uint8_t cr_max, uint16_t *hue, uint16_t *intensity, uint8_t *strategy);
-void histogram_bottom(struct image_t *img, uint16_t *hue, uint16_t *intensity);
+                              uint8_t cr_min, uint8_t cr_max, uint16_t *yd, uint16_t *ud, uint16_t *vd, uint8_t *strategy);
+void histogram_bottom(struct image_t *img, uint16_t *yd, uint16_t *ud, uint16_t *vd);
                               
-// the function to turn the rgb image to hsi
-void turn_yuv_hsi(struct image_t *img, uint8_t *buf_HSI);
 
 // the function to calculate the relationship parameter between two histogram
-uint32_t multiply(uint16_t *hue_bot, uint16_t *intensity_bot, uint16_t *hue, uint16_t *intensity);
+uint32_t multiply(uint16_t *yd_bot, uint16_t *ud_bot, uint16_t *vd_bot, uint16_t *yd, uint16_t *ud, uint16_t *vd);
 
 /*
  * this is the function for the object detector of the front camera
@@ -107,11 +106,13 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
   bool draw;
   
   //initialize the variable to get the histogram from the bottom camera
-  uint16_t hue[256] = {0};
-  uint16_t intensity[256] = {0};
+  uint16_t yd[256] = {0};
+  uint16_t ud[256] = {0};
+  uint16_t vd[256] = {0};
   if (global_filters[1].updated == true){
-      memcpy(hue, global_filters[1].hue, 256*sizeof(uint16_t));
-      memcpy(intensity, global_filters[1].intensity, 256*sizeof(uint16_t));
+      memcpy(yd, global_filters[1].yd, 256*sizeof(uint16_t));
+      memcpy(ud, global_filters[1].ud, 256*sizeof(uint16_t));
+      memcpy(vd, global_filters[1].vd, 256*sizeof(uint16_t));
   }
   
   //initialize the strategy parameter
@@ -143,7 +144,7 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
   int32_t x_c, y_c;
 
   // Filter and find centroid
-  uint32_t count = histogram_front(img, &x_c, &y_c, draw, lum_min, lum_max, cb_min, cb_max, cr_min, cr_max, hue, intensity, &strategy);
+  uint32_t count = histogram_front(img, &x_c, &y_c, draw, lum_min, lum_max, cb_min, cb_max, cr_min, cr_max, yd, ud, vd, &strategy);
   VERBOSE_PRINT("Color count %d: %u, threshold %u, x_c %d, y_c %d\n", camera, object_count, count_threshold, x_c, y_c);
   VERBOSE_PRINT("centroid %d: (%d, %d) r: %4.2f a: %4.2f\n", camera, x_c, y_c,
         hypotf(x_c, y_c) / hypotf(img->w * 0.5, img->h * 0.5), RadOfDeg(atan2f(y_c, x_c)));
@@ -167,11 +168,12 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
 static struct image_t *object_detector_bottom(struct image_t *img, uint8_t filter)
 {
 
-  uint16_t hue[256] = {0};
-  uint16_t intensity[256] = {0};
+  uint16_t yd[256] = {0};
+  uint16_t ud[256] = {0};
+  uint16_t vd[256] = {0};
   
   // Filter and find centroid
-  histogram_bottom (img, hue, intensity);
+  histogram_bottom (img, yd, ud, vd);
 
   pthread_mutex_lock(&mutex);
   global_filters[filter-1].color_count = 0;
@@ -180,8 +182,9 @@ static struct image_t *object_detector_bottom(struct image_t *img, uint8_t filte
   global_filters[filter-1].updated = true;
   
   // save the hue and intensity of the bottom camera to the global variables
-  memcpy(global_filters[filter-1].hue, hue, 256*sizeof(uint16_t));
-  memcpy(global_filters[filter-1].intensity, intensity, 256*sizeof(uint16_t));
+  memcpy(global_filters[filter-1].yd, yd, 256*sizeof(uint16_t));
+  memcpy(global_filters[filter-1].ud, ud, 256*sizeof(uint16_t));
+  memcpy(global_filters[filter-1].vd, vd, 256*sizeof(uint16_t));
   pthread_mutex_unlock(&mutex);
   
 
@@ -244,19 +247,22 @@ void color_object_detector_init(void)
 uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool draw,
                               uint8_t lum_min, uint8_t lum_max,
                               uint8_t cb_min, uint8_t cb_max,
-                              uint8_t cr_min, uint8_t cr_max, uint16_t *hue, uint16_t *intensity, uint8_t *strategy)
+                              uint8_t cr_min, uint8_t cr_max, uint16_t *yd, uint16_t *ud, uint16_t *vd, uint8_t *strategy)
 {
   uint32_t cnt = 0;
   uint32_t tot_x = 0;
   uint32_t tot_y = 0;
   uint8_t *buffer = img->buf;
   // initialie the variables to save the color histogram in three different area
-  uint16_t histogram_hue_right[256] = {0};
-  uint16_t histogram_hue_mid[256] = {0};
-  uint16_t histogram_hue_left[256] = {0};
-  uint16_t histogram_intensity_right[256] = {0};
-  uint16_t histogram_intensity_mid[256] = {0};
-  uint16_t histogram_intensity_left[256] = {0};
+  uint16_t histogram_yd_right[256] = {0};
+  uint16_t histogram_yd_mid[256] = {0};
+  uint16_t histogram_yd_left[256] = {0};
+  uint16_t histogram_ud_right[256] = {0};
+  uint16_t histogram_ud_mid[256] = {0};
+  uint16_t histogram_ud_left[256] = {0};
+  uint16_t histogram_vd_right[256] = {0};
+  uint16_t histogram_vd_mid[256] = {0};
+  uint16_t histogram_vd_left[256] = {0};
 
   // Go through all the pixels
   for (uint16_t y = 0; y < img->h; y++) {
@@ -296,39 +302,46 @@ uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool
     *p_yc = 0;
   }
   
-  //create two variables to save the RGB image and the HSI image
-  uint8_t *array = (uint8_t *)malloc(2 * img->w * img->h * sizeof(uint8_t));
-
-  // get the HSI from the YUV image
-  turn_yuv_hsi(img,array);
   
   // now we get the HSI message from the YUV image of the front camera
   for (uint16_t n = 0; n < 3; n++) {
     for (uint16_t y = 0; y < 100; y++) {
       for (uint16_t x = 0; x < 50; x ++) {
-          uint8_t hue = array[(50*2 + y * 2 + n*150*2) * img->w + 2 * x];
-          uint8_t intensity =  array[(50*2 + y * 2 + n*150*2) * img->w + 2 * x + 1];
+          uint8_t *yp, *up, *vp;
+      	  if (x % 2 == 0) {
+          // Even x
+          up = &buffer[(60*2 + y * 2 + n*150*2) * img->w + 2 * x];      // U
+          yp = &buffer[(60*2 + y * 2 + n*150*2) * 2 * img->w + 2 * x + 1];  // Y1
+          vp = &buffer[(60*2 + y * 2 + n*150*2) * 2 * img->w + 2 * x + 2];  // V
+          } else {
+          // Uneven x
+          up = &buffer[(60*2 + y * 2 + n*150*2) * img->w + 2 * x - 2];  // U
+          vp = &buffer[(60*2 + y * 2 + n*150*2) * img->w + 2 * x];      // V
+          yp = &buffer[(60*2 + y * 2 + n*150*2) * img->w + 2 * x + 1];  // Y2
+      	  }
           if (n==0){
-            histogram_hue_left[hue] += 1;
-            histogram_intensity_left[intensity] += 1;
+            histogram_yd_left[*yp] += 1;
+            histogram_ud_left[*up] += 1;
+            histogram_vd_left[*vp] += 1;
           }
           else if(n==1){
-            histogram_hue_mid[hue] += 1;
-            histogram_intensity_mid[intensity] += 1;
+            histogram_yd_mid[*yp] += 1;
+            histogram_ud_mid[*up] += 1;
+            histogram_vd_mid[*vp] += 1;
           }
           else if(n==2){
-            histogram_hue_right[hue] += 1;
-            histogram_intensity_right[intensity] += 1;
+            histogram_yd_right[*yp] += 1;
+            histogram_ud_right[*up] += 1;
+            histogram_vd_right[*vp] += 1;
           }
         }
       }
     }
-  printf("front %d\n",histogram_hue_mid[40]);
   
   // compare the histogram with the histogram from the bottom
-  uint32_t sum_left = multiply(hue, intensity, histogram_hue_left, histogram_intensity_left);
-  uint32_t sum_mid = multiply(hue, intensity, histogram_hue_mid, histogram_intensity_mid);
-  uint32_t sum_right = multiply(hue, intensity, histogram_hue_right, histogram_intensity_right); 
+  uint32_t sum_left = multiply(yd, ud, vd, histogram_yd_left, histogram_ud_left, histogram_vd_left);
+  uint32_t sum_mid = multiply(yd, ud, vd, histogram_yd_mid, histogram_ud_mid, histogram_vd_mid);
+  uint32_t sum_right = multiply(yd, ud, vd, histogram_yd_right, histogram_ud_right, histogram_vd_right); 
 
   // choose the biggest relationship and set the strategy
   uint32_t biggest_direction = sum_left;
@@ -342,7 +355,6 @@ uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool
     biggest_direction = sum_right;
     *strategy = 2;
   }
-    free(array);
   printf("the current strategy is %d\n", *strategy);
   
   return cnt;
@@ -351,26 +363,31 @@ uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool
 /* this function is to calculate the color histogram from the image of the bottom camera
  * it will send the histogram back with a pointer of an array
  */
-void histogram_bottom(struct image_t *img, uint16_t *hue, uint16_t *intensity)
+void histogram_bottom(struct image_t *img, uint16_t *yd, uint16_t *ud, uint16_t *vd)
 {
+  // initialize three histogram to save the y,u,v message
+  uint8_t *buffer = img->buf;
   
-  //create two variables to save the RGB image and the HSI image
-  uint8_t *array = (uint8_t *)malloc(2 * img->w * img->h * sizeof(uint8_t));
-
-  // get the HSI from the YUV image
-  turn_yuv_hsi(img,array);
-
-  // get the histogram of the bottom camera according to the HSI message
+  // now we get the HSI message from the YUV image of the front camera
   for (uint16_t y = 0; y < img->w; y++) {
-      for (uint16_t x = 0; x < img->h; x ++) {
-      	uint8_t hue_num = array[y * 2 * img->w + 2 * x];
-        uint8_t intensity_num =  array[y * 2 * img->w + 2 * x + 1];
-        hue[hue_num] += 1;
-        intensity[intensity_num] += 1;
+    for (uint16_t x = 0; x < img->h; x ++) {
+        uint8_t *yp, *up, *vp;
+        if (x % 2 == 0) {
+        // Even x
+        up = &buffer[y * 2 * img->w + 2 * x];      // U
+        yp = &buffer[y * 2 * 2 * img->w + 2 * x + 1];  // Y1
+        vp = &buffer[y * 2 * 2 * img->w + 2 * x + 2];  // V
+        } else {
+        // Uneven x
+        up = &buffer[y * 2 * img->w + 2 * x - 2];  // U
+        vp = &buffer[y * 2 * img->w + 2 * x];      // V
+        yp = &buffer[y * 2 * img->w + 2 * x + 1];  // Y2
+      	}
+        yd[*yp] += 1;
+        ud[*up] += 1;
+        vd[*vp] += 1;
       }
-  }
-  printf("bottom %d\n",hue[40]);
-  free(array);
+    }
 }
 
 
@@ -393,62 +410,16 @@ void color_object_detector_periodic(void)
   }
 }
 
-// the function to turn the rgb image to hsi 
-void turn_yuv_hsi(struct image_t *img, uint8_t *buf_HSI){
-
-  // get the buffer from the YUV and hsi image
-  uint8_t *buffer = img->buf;
-
-  // Go through all the pixels in the YUV image
-  for (uint16_t y = 0; y < img->h; y++) {
-    for (uint16_t x = 0; x < img->w; x ++) {
-      // Check if the color is inside the specified values
-      uint8_t *yp, *up, *vp;
-      if (x % 2 == 0) {
-        // Even x
-        up = &buffer[y * 2 * img->w + 2 * x];      // U
-        yp = &buffer[y * 2 * img->w + 2 * x + 1];  // Y1
-        vp = &buffer[y * 2 * img->w + 2 * x + 2];  // V
-        //yp = &buffer[y * 2 * img->w + 2 * x + 3]; // Y2
-      } else {
-        // Uneven x
-        up = &buffer[y * 2 * img->w + 2 * x - 2];  // U
-        //yp = &buffer[y * 2 * img->w + 2 * x - 1]; // Y1
-        vp = &buffer[y * 2 * img->w + 2 * x];      // V
-        yp = &buffer[y * 2 * img->w + 2 * x + 1];  // Y2
-      }
-
-      // draw the image to RGB
- 
-      uint8_t r = *yp + 1.44*(*vp);
-      uint8_t g = *yp - 0.39*(*up) - 0.58*(*vp);
-      uint8_t b = *yp + 2.03*(*up);
-      
-      // draw the image to HSI
-      double numerator = 0.5 * ((r - g) + (r - b));
-      double denominator = sqrt((r - g) * (r - g) + (r - b) * (g - b));
-      double theta = acos(numerator / denominator);
-      double pi = M_PI;
-      if (b<=g){
-        buf_HSI[y * 2 * img->w + 2 * x] = theta*180/pi;
-      }
-      else{
-        buf_HSI[y * 2 * img->w + 2 * x] = 360 - theta*180/pi;
-      }
-      buf_HSI[y * 2 * img->w + 2 * x + 1] = (r+g+b)/3;
-    }
-  }
-
-}
-
 // calculate the relationship parameter between two histogram
-uint32_t multiply(uint16_t *hue_bot, uint16_t *intensity_bot, uint16_t *hue, uint16_t *intensity){
-  uint32_t sum_hue = 0;
-  uint32_t sum_intensity = 0;
+uint32_t multiply(uint16_t *yd_bot, uint16_t *ud_bot, uint16_t *vd_bot, uint16_t *yd, uint16_t *ud, uint16_t *vd){
+  uint32_t sum_yd = 0;
+  uint32_t sum_ud = 0;
+  uint32_t sum_vd = 0;
   for (uint16_t y = 0; y < 256; y++) {
-    sum_hue = sum_hue + hue_bot[y]*hue[y];
-    sum_intensity = sum_intensity + intensity_bot[y]*intensity[y]; 
+    sum_yd = sum_yd + yd_bot[y]*yd[y];
+    sum_ud = sum_ud + ud_bot[y]*ud[y]; 
+    sum_vd = sum_vd + vd_bot[y]*vd[y]; 
   }
-  uint32_t sum = (sum_hue + sum_intensity)/2;
+  uint32_t sum = (sum_yd + sum_ud + sum_vd)/3;
   return sum;
 }
