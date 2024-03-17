@@ -53,12 +53,12 @@ enum navigation_state_t {
 
 // define settings
 float oa_color_count_frac = 0.18f;
-float angular_vel = 0.05f; // 0.25 degree per pixel per loop, loop is in 4 Hz
+float angular_vel = 0.13f; // 0.25 degree per pixel per loop, loop is in 4 Hz
 float maxDistance = 2.25f;              // max waypoint displacement [m]
-float k_vel = 0.01f; // 42
+float k_vel = 0.93f; // 42 0.01
 float k_psi = 0.05f; // proportion / difference between left right intensity, max is 0.5
 float k_lpf = 0.1f;
-float opticflow_free_space_threshold = 10.0f; // 42 pixel
+float opticflow_free_space_threshold = 25.0f; // 42 pixel 10
 
 // define and initialise global variables
 enum navigation_state_t navigation_state = SEARCH_FOR_SAFE_HEADING;
@@ -225,6 +225,7 @@ void opticflow_avoider_periodic(void)
     case SAFE:
       // Move waypoint forward
       moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, k_psi * (- left_intensity + right_intensity)); // CCW is +
+      // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, 0); // CCW is +
       // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         navigation_state = OUT_OF_BOUNDS;
@@ -233,8 +234,9 @@ void opticflow_avoider_periodic(void)
       } else {
         // moveWaypointDirection(WP_GOAL, moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
         moveWaypointDirection(WP_GOAL, moveDistance, k_psi * (- left_intensity + right_intensity)); // CCW is +
+        // moveWaypointDirection(WP_GOAL, moveDistance, 0); // CCW is +
         // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, 0.5f);
-        increase_nav_heading(angular_vel * (left_intensity - right_intensity)); // CW is +
+        increase_nav_heading(angular_vel * (left_intensity - right_intensity)); // CW is + should have
         // printf("angle to increase: %f", angular_vel * (highest_column_index - img_width/2))
       }
 

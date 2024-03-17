@@ -22,7 +22,7 @@ so you have to define which filter to use with the ORANGE_AVOIDER_VISUAL_DETECTI
         <dl_setting var="k_vel" min="0" step="0.05" max="50"/>
         <dl_setting var="k_psi" min="0" step="0.01" max="0.1"/>
         <dl_setting var="k_lpf" min="0" step="0.05" max="1"/>
-        <dl_setting var="opticflow_free_space_threshold" min="5" step="0.5" max="50"/>
+        <dl_setting var="opticflow_free_space_threshold" min="5" step="0.5" max="100"/>
       </dl_settings>
     </dl_settings>
   </settings>
