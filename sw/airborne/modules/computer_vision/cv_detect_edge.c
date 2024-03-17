@@ -56,9 +56,9 @@ static pthread_mutex_t mutex;
 #endif
 
 // Filter Settings
-float sigma1 = 0.6;
+float sigma1 = 3.0;
 float tlow1 = 0.5;
-float thigh1 = 0.8;
+float thigh1 = 0.95;
 
 float sigma2 = 0.6;
 float tlow2 = 0.5;
@@ -298,7 +298,14 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
     // printf("edge: %u; ", edge[current_index]);
     if ((first_edge_x_each_row[current_y]==cols+1) && !edge[current_index]) {
       first_edge_x_each_row[current_y] = current_x;
+      // printf("x: %u, ", current_x);
+      // printf("y: %u, ", current_y);
     }
+
+    // if no edge found after iterating through all columns, assin first column as edge
+    if (current_x == cols-1 && first_edge_x_each_row[current_y] == cols+1) {
+      first_edge_x_each_row[current_y] = 0;
+    }     
   }
   
   // find the column with highest free space from bottom
@@ -319,6 +326,31 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
     }
   } 
   if (longest_edge_length == -1) {longest_edge_length = cols;}
+
+  // color the 3 rows with largest space, neon green
+  for (uint16_t i=0; i<cols; i++) {
+    for (uint16_t j=row_with_largest_space-1; j<row_with_largest_space+2; j++) {
+      uint8_t *yp, *up, *vp;
+      if (i % 2 == 0) {
+        // Even x
+        up = &buffer[j * 2 * cols + 2 * i];      // U
+        yp = &buffer[j * 2 * cols + 2 * i + 1];  // Y1
+        vp = &buffer[j * 2 * cols + 2 * i + 2];  // V
+        //yp = &buffer[j * 2 * cols + 2 * i + 3]; // Y2
+      } else {
+        // Uneven x
+        up = &buffer[j * 2 * cols + 2 * i - 2];  // U
+        //yp = &buffer[j * 2 * cols + 2 * i - 1]; // Y1
+        vp = &buffer[j * 2 * cols + 2 * i];      // V
+        yp = &buffer[j * 2 * cols + 2 * i + 1];  // Y2
+      }
+      *yp = 184;  // make pixel brighter in image
+      *up = 128;  // make pixel brighter in image
+      *vp = 255;  // make pixel brighter in image
+    }
+  }
+
+
   // TODO: sliding window
   // buffer[least_first_edge_y * 2 * cols + 2 * highest_column_x - 2] = -37.52415; // U
   // buffer[least_first_edge_y * 2 * cols + 2 * highest_column_x] = 157.27575;     // V
