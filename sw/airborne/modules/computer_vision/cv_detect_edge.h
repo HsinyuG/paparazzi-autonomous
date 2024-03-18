@@ -34,6 +34,7 @@
 extern float sigma1;
 extern float tlow1;
 extern float thigh1;
+extern uint16_t pixel_variance_threshold;
 
 extern float sigma2;
 extern float tlow2;

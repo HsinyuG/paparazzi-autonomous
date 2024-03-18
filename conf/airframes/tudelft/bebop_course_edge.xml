@@ -15,6 +15,7 @@
       <define name="EDGE_DETECTOR_SIGMA1" value="0.6"/>
       <define name="EDGE_DETECTOR_TLOW1" value="0.5"/>
       <define name="EDGE_DETECTOR_THIGH1" value="0.8"/>
+      <define name="PIXEL_VAR_THRESHOLD" value="3"/>
     </target>
     <target name="nps" board="pc">
       <module name="fdm" type="gazebo"/>
@@ -22,9 +23,10 @@
       <define name="LOGGER_FILE_PATH" value="/tmp/paparazzi/log"/>
       
       <!-- Detect orange -->
-      <define name="EDGE_DETECTOR_SIGMA1" value="0.6"/>
+      <define name="EDGE_DETECTOR_SIGMA1" value="3.0"/>
       <define name="EDGE_DETECTOR_TLOW1" value="0.5"/>
-      <define name="EDGE_DETECTOR_THIGH1" value="0.8"/>
+      <define name="EDGE_DETECTOR_THIGH1" value="0.95"/>
+      <define name="PIXEL_VAR_THRESHOLD" value="3"/>
     </target>
     
     <define name="ARRIVED_AT_WAYPOINT" value="0.5"/><!-- Detect arrival at waypoint when within 0.5m -->

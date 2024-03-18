@@ -64,6 +64,8 @@ float sigma2 = 0.6;
 float tlow2 = 0.5;
 float thigh2 = 0.8;
 
+u_int16_t pixel_variance_threshold = 3;
+
 bool cod_draw1 = false;
 bool cod_draw2 = false;
 
@@ -142,33 +144,39 @@ void edge_detector_init(void)
 {
   memset(global_filters, 0, 2*sizeof(struct edge_t));
   pthread_mutex_init(&mutex, NULL);
-#ifdef EDGE_DETECTOR_CAMERA1
-#ifdef EDGE_DETECTOR_SIGMA1
-  sigma1 = EDGE_DETECTOR_SIGMA1;
-  tlow1 = EDGE_DETECTOR_TLOW1;
-  thigh1 = EDGE_DETECTOR_THIGH1;
-  
-#endif
-#ifdef EDGE_DETECTOR_DRAW1
-  cod_draw1 = EDGE_DETECTOR_DRAW1;
-#endif
+  #ifdef EDGE_DETECTOR_CAMERA1
+  #ifdef EDGE_DETECTOR_SIGMA1
+    sigma1 = EDGE_DETECTOR_SIGMA1;
+    tlow1 = EDGE_DETECTOR_TLOW1;
+    thigh1 = EDGE_DETECTOR_THIGH1;
+    
+  #endif
 
-  cv_add_to_device(&EDGE_DETECTOR_CAMERA1, edge_detector1, EDGE_DETECTOR_FPS1, 0);
-#endif
+  #ifdef PIXEL_VAR_THRESHOLD
+    pixel_variance_threshold = PIXEL_VAR_THRESHOLD;
+  #endif
+  #ifdef EDGE_DETECTOR_DRAW1
+    cod_draw1 = EDGE_DETECTOR_DRAW1;
+  #endif
 
-#ifdef EDGE_DETECTOR_CAMERA2
-#ifdef EDGE_DETECTOR_LUM_MIN2
-  sigma2 = EDGE_DETECTOR_SIGMA2;
-  tlow2 = EDGE_DETECTOR_TLOW2;
-  thigh2 = EDGE_DETECTOR_THIGH2;
+    cv_add_to_device(&EDGE_DETECTOR_CAMERA1, edge_detector1, EDGE_DETECTOR_FPS1, 0);
+  #endif
 
-#endif
-#ifdef EDGE_DETECTOR_DRAW2
-  cod_draw2 = EDGE_DETECTOR_DRAW2;
-#endif
+  #ifdef EDGE_DETECTOR_CAMERA2
+  #ifdef EDGE_DETECTOR_LUM_MIN2
+    sigma2 = EDGE_DETECTOR_SIGMA2;
+    tlow2 = EDGE_DETECTOR_TLOW2;
+    thigh2 = EDGE_DETECTOR_THIGH2;
 
-  cv_add_to_device(&EDGE_DETECTOR_CAMERA2, edge_detector2, EDGE_DETECTOR_FPS2, 1);
-#endif
+  #endif
+  #ifdef EDGE_DETECTOR_DRAW2
+    cod_draw2 = EDGE_DETECTOR_DRAW2;
+  #endif
+
+    cv_add_to_device(&EDGE_DETECTOR_CAMERA2, edge_detector2, EDGE_DETECTOR_FPS2, 1);
+
+    
+  #endif
 }
 
 /*
@@ -280,6 +288,7 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
   }
 
   // find the lowest edge for each column
+  // note - the image is rotated 90 degrees
   uint32_t edge_array_length = rows * cols;
 
   uint16_t *first_edge_x_each_row = (uint16_t *)malloc(rows * sizeof(uint16_t));
@@ -296,6 +305,7 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
     // printf("y: %u, ", current_y);
     // printf("i: %u, ", current_index);
     // printf("edge: %u; ", edge[current_index]);
+    // if no values assigned to row, assign first edge
     if ((first_edge_x_each_row[current_y]==cols+1) && !edge[current_index]) {
       first_edge_x_each_row[current_y] = current_x;
       // printf("x: %u, ", current_x);
@@ -305,7 +315,8 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
     // if no edge found after iterating through all columns, assin first column as edge
     if (current_x == cols-1 && first_edge_x_each_row[current_y] == cols+1) {
       first_edge_x_each_row[current_y] = 0;
-    }     
+    }
+
   }
   
   // find the column with highest free space from bottom
@@ -320,11 +331,20 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
     first_edge_x_each_row_filtered[i-1] = median_filter(edge_array, 3);
     // printf("median: %u, ", first_edge_x_each_row_filtered[i-1]);
     // printf("%u: %u, ", i-1, first_edge_x_each_row_filtered[i-1]);
+    
+    // if varience of edge lengths in edge array is too high, ignore this row
+    if (abs(first_edge_x_each_row[i-1] - first_edge_x_each_row[i]) > pixel_variance_threshold || 
+        abs(first_edge_x_each_row[i] - first_edge_x_each_row[i+1]) > pixel_variance_threshold) {
+      continue;
+    }
+  
+
     if (first_edge_x_each_row_filtered[i-1] > longest_edge_length) {
       longest_edge_length = first_edge_x_each_row_filtered[i-1];
       row_with_largest_space = i;
     }
   } 
+  
   if (longest_edge_length == -1) {longest_edge_length = cols;}
 
   // color the 3 rows with largest space, neon green

@@ -209,7 +209,7 @@ void edge_avoider_periodic(void)
 
   // update our safe confidence using direction threshold
   uint16_t direction_threshold = 100; // pixel, total is 520 in width, 240 in height for parrot bebop
-  uint16_t free_space_threshold = 100; // pixel
+  uint16_t free_space_threshold = 10; // pixel
   uint16_t img_width = 520; // should be front_camera.output_size.w
 
   float moveDistance = fmin(maxDistance, first_edge_height * k_vel);
@@ -220,15 +220,20 @@ void edge_avoider_periodic(void)
     case SAFE:
       // Move waypoint forward
       // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, 0.5f);
-      moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
+      moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, - (float)highest_column_index/(float)img_width + 0.5f); // direction from 
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         navigation_state = OUT_OF_BOUNDS;
       } else if (first_edge_height <= free_space_threshold){
         navigation_state = OBSTACLE_FOUND; // no direction to go in current yaw
       } else {
+        
+        // turn and then move forward
+        // difference in removing this is not obvious
+        // increase_nav_heading(angular_vel * (float)(highest_column_index - img_width/2));
+        
         moveWaypointDirection(WP_GOAL, moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
         // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, 0.5f);
-        increase_nav_heading(angular_vel * (float)(highest_column_index - img_width/2)); // not minus because the yaw seems CW as +
+        // increase_nav_heading(angular_vel * (float)(highest_column_index - img_width/2)); // not minus because the yaw seems CW as +
         // printf("angle to increase: %f", angular_vel * (highest_column_index - img_width/2))
       }
 
