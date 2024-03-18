@@ -79,6 +79,7 @@ struct color_object_t {
   uint16_t yd[256];
   uint16_t ud[256];
   uint16_t vd[256];
+  uint8_t strategy;
 };
 struct color_object_t global_filters[2];
 
@@ -145,15 +146,18 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
 
   // Filter and find centroid
   uint32_t count = histogram_front(img, &x_c, &y_c, draw, lum_min, lum_max, cb_min, cb_max, cr_min, cr_max, yd, ud, vd, &strategy);
-  VERBOSE_PRINT("Color count %d: %u, threshold %u, x_c %d, y_c %d\n", camera, object_count, count_threshold, x_c, y_c);
-  VERBOSE_PRINT("centroid %d: (%d, %d) r: %4.2f a: %4.2f\n", camera, x_c, y_c,
-        hypotf(x_c, y_c) / hypotf(img->w * 0.5, img->h * 0.5), RadOfDeg(atan2f(y_c, x_c)));
+  //VERBOSE_PRINT("Color count %d: %u, threshold %u, x_c %d, y_c %d\n", camera, object_count, count_threshold, x_c, y_c);
+  //VERBOSE_PRINT("centroid %d: (%d, %d) r: %4.2f a: %4.2f\n", camera, x_c, y_c,
+        //hypotf(x_c, y_c) / hypotf(img->w * 0.5, img->h * 0.5), RadOfDeg(atan2f(y_c, x_c)));
 
   pthread_mutex_lock(&mutex);
   global_filters[filter-1].color_count = count;
   global_filters[filter-1].x_c = x_c;
   global_filters[filter-1].y_c = y_c;
   global_filters[filter-1].updated = true;
+  
+  // save the strategy in the global filter, so we could send the message through the global filter
+  global_filters[filter-1].strategy = strategy;
   pthread_mutex_unlock(&mutex);
 
   return img;
@@ -253,6 +257,7 @@ uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool
   uint32_t tot_x = 0;
   uint32_t tot_y = 0;
   uint8_t *buffer = img->buf;
+  
   // initialie the variables to save the color histogram in three different area
   uint16_t histogram_yd_right[256] = {0};
   uint16_t histogram_yd_mid[256] = {0};
@@ -264,7 +269,7 @@ uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool
   uint16_t histogram_vd_mid[256] = {0};
   uint16_t histogram_vd_left[256] = {0};
 
-  // Go through all the pixels
+  // Go through all the pixels and get the yuv information of the image
   for (uint16_t y = 0; y < img->h; y++) {
     for (uint16_t x = 0; x < img->w; x ++) {
       // Check if the color is inside the specified values
@@ -304,35 +309,40 @@ uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool
   
   
   // now we get the HSI message from the YUV image of the front camera
-  for (uint16_t n = 0; n < 3; n++) {
+  for (uint16_t n = 0; n < 4; n++) {
     for (uint16_t y = 0; y < 100; y++) {
-      for (uint16_t x = 0; x < 50; x ++) {
+      for (uint16_t x = 0; x < 40; x ++) {
           uint8_t *yp, *up, *vp;
       	  if (x % 2 == 0) {
           // Even x
-          up = &buffer[(60*2 + y * 2 + n*150*2) * img->w + 2 * x];      // U
-          yp = &buffer[(60*2 + y * 2 + n*150*2) * 2 * img->w + 2 * x + 1];  // Y1
-          vp = &buffer[(60*2 + y * 2 + n*150*2) * 2 * img->w + 2 * x + 2];  // V
+          up = &buffer[(60*2 + y * 2 + n*100*2) * img->w + 2 * x];      // U
+          yp = &buffer[(60*2 + y * 2 + n*100*2) * 2 * img->w + 2 * x + 1];  // Y1
+          vp = &buffer[(60*2 + y * 2 + n*100*2) * 2 * img->w + 2 * x + 2];  // V
           } else {
           // Uneven x
-          up = &buffer[(60*2 + y * 2 + n*150*2) * img->w + 2 * x - 2];  // U
-          vp = &buffer[(60*2 + y * 2 + n*150*2) * img->w + 2 * x];      // V
-          yp = &buffer[(60*2 + y * 2 + n*150*2) * img->w + 2 * x + 1];  // Y2
+          up = &buffer[(60*2 + y * 2 + n*100*2) * img->w + 2 * x - 2];  // U
+          vp = &buffer[(60*2 + y * 2 + n*100*2) * img->w + 2 * x];      // V
+          yp = &buffer[(60*2 + y * 2 + n*100*2) * img->w + 2 * x + 1];  // Y2
       	  }
           if (n==0){
-            histogram_yd_left[*yp] += 1;
-            histogram_ud_left[*up] += 1;
-            histogram_vd_left[*vp] += 1;
+            histogram_yd_left[*yp] += 4;
+            histogram_ud_left[*up] += 4;
+            histogram_vd_left[*vp] += 4;
           }
           else if(n==1){
-            histogram_yd_mid[*yp] += 1;
-            histogram_ud_mid[*up] += 1;
-            histogram_vd_mid[*vp] += 1;
+            histogram_yd_mid[*yp] += 3;
+            histogram_ud_mid[*up] += 3;
+            histogram_vd_mid[*vp] += 3;
           }
           else if(n==2){
-            histogram_yd_right[*yp] += 1;
-            histogram_ud_right[*up] += 1;
-            histogram_vd_right[*vp] += 1;
+            histogram_yd_mid[*yp] += 3;
+            histogram_ud_mid[*up] += 3;
+            histogram_vd_mid[*vp] += 3;
+          }
+          else if(n==3){
+            histogram_yd_right[*yp] += 4;
+            histogram_ud_right[*up] += 4;
+            histogram_vd_right[*vp] += 4;
           }
         }
       }
@@ -344,18 +354,17 @@ uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool
   uint32_t sum_right = multiply(yd, ud, vd, histogram_yd_right, histogram_ud_right, histogram_vd_right); 
 
   // choose the biggest relationship and set the strategy
-  uint32_t biggest_direction = sum_left;
-  printf("the sum of three different direcction is %d,%d,%d\n", sum_left, sum_mid, sum_right);
+  uint32_t biggest_direction = sum_mid;
   *strategy = 0;
-  if (sum_mid>biggest_direction){
-    biggest_direction = sum_mid;
+  if (sum_left>biggest_direction){
+    biggest_direction = sum_left;
     *strategy = 1;
   }
   if (sum_right > biggest_direction){
     biggest_direction = sum_right;
     *strategy = 2;
   }
-  printf("the current strategy is %d\n", *strategy);
+  //printf("the current strategy is %d\n", *strategy);
   
   return cnt;
 }
@@ -396,11 +405,12 @@ void color_object_detector_periodic(void)
   static struct color_object_t local_filters[2];
   pthread_mutex_lock(&mutex);
   memcpy(local_filters, global_filters, 2*sizeof(struct color_object_t));
+  printf("the current strategy from the cv detector is %d", local_filters[0].strategy);
   pthread_mutex_unlock(&mutex);
 
   if(local_filters[0].updated){
     AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION1_ID, local_filters[0].x_c, local_filters[0].y_c,
-        0, 0, local_filters[0].color_count, 0);
+        0, local_filters[0].strategy, local_filters[0].color_count, 0);
     local_filters[0].updated = false;
   }
   if(local_filters[1].updated){
