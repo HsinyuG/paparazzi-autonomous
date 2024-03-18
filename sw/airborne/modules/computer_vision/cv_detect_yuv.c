@@ -371,6 +371,7 @@ uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool
 
 /* this function is to calculate the color histogram from the image of the bottom camera
  * it will send the histogram back with a pointer of an array
+ * we only choose the central part of the bottom image to get the range of the yuv channel 
  */
 void histogram_bottom(struct image_t *img, uint16_t *yd, uint16_t *ud, uint16_t *vd)
 {
@@ -378,19 +379,19 @@ void histogram_bottom(struct image_t *img, uint16_t *yd, uint16_t *ud, uint16_t 
   uint8_t *buffer = img->buf;
   
   // now we get the HSI message from the YUV image of the front camera
-  for (uint16_t y = 0; y < img->w; y++) {
-    for (uint16_t x = 0; x < img->h; x ++) {
+  for (uint16_t y = 0; y < 100; y++) {
+    for (uint16_t x = 0; x < 100; x ++) {
         uint8_t *yp, *up, *vp;
         if (x % 2 == 0) {
         // Even x
-        up = &buffer[y * 2 * img->w + 2 * x];      // U
-        yp = &buffer[y * 2 * 2 * img->w + 2 * x + 1];  // Y1
-        vp = &buffer[y * 2 * 2 * img->w + 2 * x + 2];  // V
+        up = &buffer[(70 * 2 + y * 2) * img->w + (70 *2 + 2 * x)];      // U
+        yp = &buffer[(70 * 2 + y * 2) * img->w + (70 *2 + 2 * x) + 1];  // Y1
+        vp = &buffer[(70 * 2 + y * 2) * img->w + (70 *2 + 2 * x) + 2];  // V
         } else {
         // Uneven x
-        up = &buffer[y * 2 * img->w + 2 * x - 2];  // U
-        vp = &buffer[y * 2 * img->w + 2 * x];      // V
-        yp = &buffer[y * 2 * img->w + 2 * x + 1];  // Y2
+        up = &buffer[(70 * 2 + y * 2) * img->w + (70 *2 + 2 * x) - 2];  // U
+        vp = &buffer[(70 * 2 + y * 2) * img->w + (70 *2 + 2 * x)];      // V
+        yp = &buffer[(70 * 2 + y * 2) * img->w + (70 *2 + 2 * x) + 1];  // Y2
       	}
         yd[*yp] += 1;
         ud[*up] += 1;
