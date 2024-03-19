@@ -287,6 +287,21 @@ uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool
         vp = &buffer[y * 2 * img->w + 2 * x];      // V
         yp = &buffer[y * 2 * img->w + 2 * x + 1];  // Y2
       }
+      if (y>100 && y<180 && x>0 && x<40){
+        histogram_yd_left[*yp] += 4;
+        histogram_ud_left[*up] += 4;
+        histogram_vd_left[*vp] += 4;
+      }
+      if (y>180 && y<340 && x>0 && x<40){
+        histogram_yd_mid[*yp] += 2;
+        histogram_ud_mid[*up] += 2;
+        histogram_vd_mid[*vp] += 2;
+      }
+      if (y>340 && y<420 && x>0 && x<40){
+        histogram_yd_right[*yp] += 4;
+        histogram_ud_right[*up] += 4;
+        histogram_vd_right[*vp] += 4;
+      }
       if ( (*yp >= lum_min) && (*yp <= lum_max) &&
            (*up >= cb_min ) && (*up <= cb_max ) &&
            (*vp >= cr_min ) && (*vp <= cr_max )) {
@@ -308,54 +323,23 @@ uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool
   }
   
   
-  // now we get the HSI message from the YUV image of the front camera
-  for (uint16_t n = 0; n < 4; n++) {
-    for (uint16_t y = 0; y < 100; y++) {
-      for (uint16_t x = 0; x < 40; x ++) {
-          uint8_t *yp, *up, *vp;
-      	  if (x % 2 == 0) {
-          // Even x
-          up = &buffer[(60*2 + y * 2 + n*100*2) * img->w + 2 * x];      // U
-          yp = &buffer[(60*2 + y * 2 + n*100*2) * 2 * img->w + 2 * x + 1];  // Y1
-          vp = &buffer[(60*2 + y * 2 + n*100*2) * 2 * img->w + 2 * x + 2];  // V
-          } else {
-          // Uneven x
-          up = &buffer[(60*2 + y * 2 + n*100*2) * img->w + 2 * x - 2];  // U
-          vp = &buffer[(60*2 + y * 2 + n*100*2) * img->w + 2 * x];      // V
-          yp = &buffer[(60*2 + y * 2 + n*100*2) * img->w + 2 * x + 1];  // Y2
-      	  }
-          if (n==0){
-            histogram_yd_left[*yp] += 4;
-            histogram_ud_left[*up] += 4;
-            histogram_vd_left[*vp] += 4;
-          }
-          else if(n==1){
-            histogram_yd_mid[*yp] += 3;
-            histogram_ud_mid[*up] += 3;
-            histogram_vd_mid[*vp] += 3;
-          }
-          else if(n==2){
-            histogram_yd_mid[*yp] += 3;
-            histogram_ud_mid[*up] += 3;
-            histogram_vd_mid[*vp] += 3;
-          }
-          else if(n==3){
-            histogram_yd_right[*yp] += 4;
-            histogram_ud_right[*up] += 4;
-            histogram_vd_right[*vp] += 4;
-          }
-        }
-      }
-    }
-  
   // compare the histogram with the histogram from the bottom
   uint32_t sum_left = multiply(yd, ud, vd, histogram_yd_left, histogram_ud_left, histogram_vd_left);
   uint32_t sum_mid = multiply(yd, ud, vd, histogram_yd_mid, histogram_ud_mid, histogram_vd_mid);
   uint32_t sum_right = multiply(yd, ud, vd, histogram_yd_right, histogram_ud_right, histogram_vd_right); 
 
   // choose the biggest relationship and set the strategy
+  printf("the current sum of the three part of the image is %d, %d, %d", sum_left,sum_mid,sum_right);
   uint32_t biggest_direction = sum_mid;
   *strategy = 0;
+  if (sum_left<5000000){
+    *strategy = 2;
+    return cnt;
+  }
+  if (sum_right<5000000){
+    *strategy = 1;
+    return cnt;
+  } 
   if (sum_left>biggest_direction){
     biggest_direction = sum_left;
     *strategy = 1;
@@ -406,7 +390,7 @@ void color_object_detector_periodic(void)
   static struct color_object_t local_filters[2];
   pthread_mutex_lock(&mutex);
   memcpy(local_filters, global_filters, 2*sizeof(struct color_object_t));
-  printf("the current strategy from the cv detector is %d", local_filters[0].strategy);
+  //printf("the current strategy from the cv detector is %d", local_filters[0].strategy);
   pthread_mutex_unlock(&mutex);
 
   if(local_filters[0].updated){

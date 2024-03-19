@@ -81,7 +81,6 @@ static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
 {
   color_count = quality;
   strategy = pixel_height;
-  printf("the current strategy of the drone is %d",strategy);
 }
 
 /*
@@ -111,7 +110,7 @@ void orange_avoider_periodic(void)
   int32_t color_count_threshold = oa_color_count_frac * front_camera.output_size.w * front_camera.output_size.h;
 
   //VERBOSE_PRINT("Color_count: %d  threshold: %d state: %d \n", color_count, color_count_threshold, navigation_state);
-  printf("the current state is %d",navigation_state );
+  
 
   // update our safe confidence using color threshold
   if(color_count < color_count_threshold){
@@ -124,17 +123,20 @@ void orange_avoider_periodic(void)
   Bound(obstacle_free_confidence, 0, max_trajectory_confidence);
 
   float moveDistance = maxDistance;
+  float moveDistance_out = 0.5*moveDistance;
+  printf("the current control strategy of the drone is %d\n",strategy);
+  printf("the current state is %d\n",navigation_state);
 
   switch (navigation_state){
     case SAFE:
       // Move waypoint forward
-      moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance);
+      moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance_out);
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         navigation_state = OUT_OF_BOUNDS;
       } else if (strategy != 0){
         navigation_state = OBSTACLE_FOUND;
       } else {
-        moveWaypointForward(WP_GOAL, 1*moveDistance);
+        moveWaypointForward(WP_GOAL, 2*moveDistance);
       }
 
       break;
@@ -145,17 +147,21 @@ void orange_avoider_periodic(void)
 
       // randomly select new search direction
       chooseRandomIncrementAvoidance(strategy);
+      printf("the current heading increment is %f /n",heading_increment);
 
       navigation_state = SEARCH_FOR_SAFE_HEADING;
       
       break;
     case SEARCH_FOR_SAFE_HEADING:
+      printf("now we are in state 3, the strategy is %d",strategy);
+      chooseRandomIncrementAvoidance(strategy);
       increase_nav_heading(heading_increment);
       moveWaypointForward(WP_GOAL, 0.5*moveDistance);
 
 
       // make sure we have a couple of good readings before declaring the way safe
       if (strategy == 0){
+      	printf("the strategy change to safe");
         navigation_state = SAFE;
       }
       break;
