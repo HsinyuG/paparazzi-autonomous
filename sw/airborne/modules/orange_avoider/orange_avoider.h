@@ -25,7 +25,9 @@ extern uint16_t threshold_move_back;
 extern float proportion_move_back;
 extern float proportion_predict;
 extern float ang_vel;
-
+extern bool use_vel_control;
+extern float forward_vel;
+extern float backward_vel;
 
 // functions
 extern void orange_avoider_init(void);

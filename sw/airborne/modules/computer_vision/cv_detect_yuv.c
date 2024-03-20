@@ -257,6 +257,11 @@ void color_object_detector_init(void)
 
   cv_add_to_device(&COLOR_OBJECT_DETECTOR_CAMERA2, object_detector2, COLOR_OBJECT_DETECTOR_FPS2, 1);
 #endif
+
+#ifdef THRESHOLD_MIDDLE
+threshold_middle = THRESHOLD_MIDDLE;
+threshold_sideways = THRESHOLD_SIDEWAYS;
+#endif
 }
 
 /* this function is to calculate the color histogram from the image of the front camera

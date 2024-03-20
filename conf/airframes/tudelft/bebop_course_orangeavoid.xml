@@ -12,12 +12,38 @@
       <define name="MT9V117_TARGET_FPS" value="20"/>
       
       <!-- Detect orange -->
-      <define name="COLOR_OBJECT_DETECTOR_LUM_MIN1" value="30"/>
-      <define name="COLOR_OBJECT_DETECTOR_LUM_MAX1" value="190"/>
+      <!-- <define name="COLOR_OBJECT_DETECTOR_LUM_MIN1" value="30"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_LUM_MAX1" value="190"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CB_MIN1" value="70"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CB_MAX1" value="130"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CR_MIN1" value="150"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="190"/> -->
+
+      <!-- Detect green -->
+      <define name="COLOR_OBJECT_DETECTOR_LUM_MIN1" value="70"/>
+      <define name="COLOR_OBJECT_DETECTOR_LUM_MAX1" value="150"/>
       <define name="COLOR_OBJECT_DETECTOR_CB_MIN1" value="70"/>
-      <define name="COLOR_OBJECT_DETECTOR_CB_MAX1" value="130"/>
-      <define name="COLOR_OBJECT_DETECTOR_CR_MIN1" value="150"/>
-      <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="190"/>
+      <define name="COLOR_OBJECT_DETECTOR_CB_MAX1" value="100"/>
+      <define name="COLOR_OBJECT_DETECTOR_CR_MIN1" value="100"/>
+      <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="125"/>
+      <define name="COLOR_OBJECT_DETECTOR_BOTTOM_HEIGHT1" value="80"/>
+
+      <!-- control -->
+      <define name="MAX_DISTANCE" value="2.25"/>
+      <define name="FORWARD_VEL" value="0.5"/>
+      <define name="BACKWARD_VEL" value="0.5"/>
+      <define name="THRESHOLD_MOVE_BACK" value="2"/>
+      <define name="PROPORTION_MOVE_BACK" value="0.05"/>
+      <define name="PROPORTION_PREDICT" value="0.5"/>
+      <define name="ANG_VEL" value="1.57"/>
+      <define name="RANDOM_ROTATE_AVOID" value="TRUE"/>
+      <define name="COMPARE_MIDDLE_LEFT_RIGHT" value="FALSE"/>
+      <define name="ENABLE_BOUNDS_DETECT" value="FALSE"/>
+
+      <!-- perception -->
+      <define name="THRESHOLD_MIDDLE" value="8000"/>
+      <define name="THRESHOLD_SIDEWAYS" value="5000"/>
+
     </target>
     <target name="nps" board="pc">
       <module name="fdm" type="gazebo"/>
@@ -25,12 +51,38 @@
       <define name="LOGGER_FILE_PATH" value="/tmp/paparazzi/log"/>
       
       <!-- Detect orange -->
-      <define name="COLOR_OBJECT_DETECTOR_LUM_MIN1" value="41"/>
-      <define name="COLOR_OBJECT_DETECTOR_LUM_MAX1" value="183"/>
-      <define name="COLOR_OBJECT_DETECTOR_CB_MIN1" value="53"/>
-      <define name="COLOR_OBJECT_DETECTOR_CB_MAX1" value="121"/>
-      <define name="COLOR_OBJECT_DETECTOR_CR_MIN1" value="134"/>
-      <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="249"/>
+      <!-- <define name="COLOR_OBJECT_DETECTOR_LUM_MIN1" value="41"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_LUM_MAX1" value="183"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CB_MIN1" value="53"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CB_MAX1" value="121"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CR_MIN1" value="134"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="249"/> -->
+
+      <!-- Detect green -->
+      <define name="COLOR_OBJECT_DETECTOR_LUM_MIN1" value="70"/>
+      <define name="COLOR_OBJECT_DETECTOR_LUM_MAX1" value="150"/>
+      <define name="COLOR_OBJECT_DETECTOR_CB_MIN1" value="70"/>
+      <define name="COLOR_OBJECT_DETECTOR_CB_MAX1" value="100"/>
+      <define name="COLOR_OBJECT_DETECTOR_CR_MIN1" value="100"/>
+      <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="125"/>
+      <define name="COLOR_OBJECT_DETECTOR_BOTTOM_HEIGHT1" value="80"/>
+
+      <!-- control -->
+      <define name="MAX_DISTANCE" value="2.25"/>
+      <define name="FORWARD_VEL" value="0.5"/>
+      <define name="BACKWARD_VEL" value="0.5"/>
+      <define name="THRESHOLD_MOVE_BACK" value="2"/>
+      <define name="PROPORTION_MOVE_BACK" value="0.05"/>
+      <define name="PROPORTION_PREDICT" value="0.5"/>
+      <define name="ANG_VEL" value="1.57"/>
+      <define name="RANDOM_ROTATE_AVOID" value="TRUE"/>
+      <define name="COMPARE_MIDDLE_LEFT_RIGHT" value="FALSE"/>
+      <define name="ENABLE_BOUNDS_DETECT" value="FALSE"/>
+
+      <!-- perception -->
+      <define name="THRESHOLD_MIDDLE" value="8000"/>
+      <define name="THRESHOLD_SIDEWAYS" value="5000"/>
+      
     </target>
     
     <define name="ARRIVED_AT_WAYPOINT" value="0.5"/><!-- Detect arrival at waypoint when within 0.5m -->

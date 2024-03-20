@@ -19,11 +19,14 @@
 
 #include "modules/orange_avoider/orange_avoider.h"
 #include "firmwares/rotorcraft/navigation.h"
+#include "firmwares/rotorcraft/guidance/guidance_h.h"
 #include "generated/airframe.h"
 #include "state.h"
 #include "modules/core/abi.h"
 #include <time.h>
 #include <stdio.h>
+
+#include "firmwares/rotorcraft/autopilot_firmware.h"
 
 #define NAV_C // needed to get the nav functions like Inside...
 #include "generated/flight_plan.h"
@@ -72,6 +75,10 @@ const int16_t max_trajectory_confidence = 5; // number of consecutive negative o
 bool random_rotate_avoid = true; // = true's reason: difficult to make sure the obstacle avoid is not triggerrd before out of bound when facing outside, and if keeps rotate deterministic it will face dead lock
 bool compare_middle_left_right = false; // true --> feasible direction not only requrire middle > threshold, but also require middle > left and right
 bool enable_bounds_detect = false; // true --> enable OUT_OF_BOUNDS state detection
+
+bool use_vel_control = true;
+float forward_vel = 0.4;
+float backward_vel = 0.1;
 
 uint16_t count_move_back = 0;
 uint16_t threshold_move_back = 2;
@@ -149,6 +156,19 @@ void green_tracker_init(void)
   // bind our colorfilter callbacks to receive the color filter outputs
   // AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, green_detection_cb);
   AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, bottom_detection_cb);
+
+  #ifdef FORWARD_VEL
+  maxDistance = MAX_DISTANCE;
+  forward_vel = FORWARD_VEL;
+  backward_vel = BACKWARD_VEL;
+  threshold_move_back = THRESHOLD_MOVE_BACK;
+  proportion_move_back = PROPORTION_MOVE_BACK;
+  proportion_predict = PROPORTION_PREDICT;
+  ang_vel = ANG_VEL;
+  random_rotate_avoid = RANDOM_ROTATE_AVOID;
+  compare_middle_left_right = COMPARE_MIDDLE_LEFT_RIGHT;
+  enable_bounds_detect = ENABLE_BOUNDS_DETECT;
+  #endif
 }
 //END of CHANGJUN ADDED PART 
 /*
@@ -237,34 +257,52 @@ void green_tracker_periodic(void)
   if(!autopilot_in_flight()){
     return;
   }
+  if (autopilot_mode_auto2 == AP_MODE_GUIDED) use_vel_control = true;
+  else use_vel_control = false; // if (autopilot_mode_auto2 == AP_MODE_NAV)
+
   float moveDistance = maxDistance;
   switch (navigation_state){
     case SAFE:
-      // Move waypoint forward
-      moveWaypointForward(WP_TRAJECTORY, proportion_predict * moveDistance); // 1.5f *  ; 0.75f + 
-
       if ( ((green_detect_result != ACTION_FORWARD) && compare_middle_left_right) ||\
         ((green_detect_result == ACTION_LEFT || green_detect_result == ACTION_RIGHT) && !compare_middle_left_right))
       { // it should be able to detect the boundary as well
         green_tracker_direction = green_detect_result;
-
         navigation_state = OBSTACLE_FOUND;
       } 
-      else if ( (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))) && enable_bounds_detect )
-      { // only necessary if outside someone holding a green cloth
-        chooseRandomIncrementAvoidance();
-        // green_tracker_direction = green_detect_result;
-        navigation_state = OUT_OF_BOUNDS;
-      }  
-      else {
-        moveWaypointForward(WP_GOAL, moveDistance);
+      else if (use_vel_control)
+      {
+        // Move waypoint forward
+        guidance_h_set_body_vel(forward_vel, 0);
+        guidance_h_set_heading_rate(0);
       }
+      else
+      {
+        moveWaypointForward(WP_TRAJECTORY, proportion_predict * moveDistance); // 1.5f *  ; 0.75f + 
+        if ( (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))) && enable_bounds_detect )
+        { // only necessary if outside someone holding a green cloth
+          chooseRandomIncrementAvoidance();
+          // green_tracker_direction = green_detect_result;
+          navigation_state = OUT_OF_BOUNDS;
+        }  
+        else 
+        {
+          moveWaypointForward(WP_GOAL, moveDistance);
+        }
+      }  
 
       break;
     case OBSTACLE_FOUND:
       // stop
-      waypoint_move_here_2d(WP_GOAL);
-      waypoint_move_here_2d(WP_TRAJECTORY);
+      if (use_vel_control)
+      {
+        guidance_h_set_body_vel(0, 0);
+      }
+      else
+      {
+        waypoint_move_here_2d(WP_GOAL);
+        waypoint_move_here_2d(WP_TRAJECTORY);
+      }
+
       // Obstacle_found then change yaw velocity:
       if (!random_rotate_avoid) {
         switch (green_tracker_direction)
@@ -290,15 +328,17 @@ void green_tracker_periodic(void)
         chooseRandomIncrementAvoidance();
       }
       
-
-
       navigation_state = MOVE_BACK;
 
       break;
     case SEARCH_FOR_SAFE_HEADING: // continue on certain direction to turn, to prevent conflict direction in OBSTACLE_FOUND after OUT_OF_BOUNDS
-      increase_nav_heading(5.f * heading_increment);
-      // guidance_h_set_heading_rate(heading_increment * ang_vel);
-
+      if (use_vel_control) {
+        guidance_h_set_body_vel(0, 0);
+        guidance_h_set_heading_rate(heading_increment * ang_vel);
+      }
+      else {
+        increase_nav_heading(5.f * heading_increment);
+      }
       // make sure we have a couple of good readings before declaring the way safe
       // if (obstacle_free_confidence >= 2){
       //   navigation_state = SAFE;
@@ -329,12 +369,27 @@ void green_tracker_periodic(void)
       }
       break;
     case MOVE_BACK: // not considering move back and out of bounds, because we come from that direction
-        moveWaypointForward(WP_GOAL, - proportion_move_back * moveDistance);
-        moveWaypointForward(WP_TRAJECTORY, - proportion_move_back * moveDistance);
+        if (use_vel_control)
+        {
+          guidance_h_set_body_vel(-backward_vel, 0);
+        }
+        else
+        {
+          moveWaypointForward(WP_GOAL, - proportion_move_back * moveDistance);
+          moveWaypointForward(WP_TRAJECTORY, - proportion_move_back * moveDistance);
+        }
         if (count_move_back >= threshold_move_back) {
           navigation_state = SEARCH_FOR_SAFE_HEADING;
-          waypoint_move_here_2d(WP_GOAL);
-          waypoint_move_here_2d(WP_TRAJECTORY);
+          if (use_vel_control)
+          {
+            guidance_h_set_body_vel(0, 0);
+          }
+          else
+          {
+            waypoint_move_here_2d(WP_GOAL);
+            waypoint_move_here_2d(WP_TRAJECTORY);
+          }
+
           count_move_back = 0;
         }
         count_move_back ++;
@@ -350,6 +405,7 @@ void green_tracker_periodic(void)
   printf("L = %d ----- R = %d ----- THS = %d ----- M = %d ----- THM = %d ----- ", \
     count_left, count_right, threshold_sideways, count_middle, threshold_middle);
   **/
+  printf("mode: %u ----- ", autopilot_mode_auto2);
   printf("state: %d ----- ", navigation_state);
   printf("detection: %d ----- \n", green_detect_result);
   // printf("disp = %f at %d\n", total_displacement, now_ts);

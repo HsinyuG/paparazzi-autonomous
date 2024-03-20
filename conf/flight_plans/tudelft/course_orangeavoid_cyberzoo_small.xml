@@ -8,6 +8,15 @@
     #include "modules/ahrs/ahrs.h"
     <!-- #define NPS_GAZEBO_WORLD "cyberzoo_orange_poles.world" -->
     #define NPS_GAZEBO_WORLD "cyberzoo_9_orange_poles.world"
+#include "autopilot.h"
+inline void setNav(void){
+  autopilot_mode_auto2 = AP_MODE_NAV;
+  autopilot_static_set_mode(AP_MODE_NAV);
+}
+inline void setGuided(void){
+  autopilot_mode_auto2 = AP_MODE_GUIDED;
+  autopilot_static_set_mode(AP_MODE_GUIDED);
+}
 </header>
   <waypoints>
     <waypoint lat="51.990631" lon="4.376796" name="HOME"/>
@@ -102,12 +111,23 @@
       <call_once fun="NavSetWaypointHere(WP_STDBY)"/>
       <stay wp="STDBY"/>
     </block>
-    <block key="g" name="START" strip_button="Go" strip_icon="lookfore.png">
+    <block key="g" name="START Guided" strip_button="Go" strip_icon="lookfore.png">
+      <!-- <call_once fun="NavSetWaypointHere(WP_GOAL)"/> -->
+      <!-- <stay wp="GOAL"/> -->
+      <call_once fun="setGuided()"/>
+      <stay wp="STDBY"/>
+    </block>
+      <block key="g" name="START NAV" strip_button="Go" strip_icon="lookfore.png">
+      <call_once fun="setNav()"/>
       <call_once fun="NavSetWaypointHere(WP_GOAL)"/>
       <stay wp="GOAL"/>
+      <!-- <call_once fun="setGuided()"/> -->
+      <!-- <stay wp="STDBY"/> -->
     </block>
     <block name="STOP">
       <call_once fun="NavSetWaypointHere(WP_STDBY)"/>
+      <!-- set back to NAV -->
+      <call_once fun="setNav()"/>
       <stay wp="STDBY"/>
     </block>
     <block key="l" name="land here" strip_button="land here" strip_icon="land-right.png">
