@@ -1,15 +1,14 @@
 <!DOCTYPE layout SYSTEM "layout.dtd">
 
-<layout width="1500" height="1000">
- <columns>
-   <rows size="400">
-      <widget size="500" name="strips"/>
-<!--      <widget size="300" name="plugin"/> -->
-      <widget name="alarms"/>
-   </rows>
-   <rows>
-     <widget name="map2d" size="700"/>
-     <widget name="aircraft"/>
-   </rows>
- </columns>
+<layout width="1173" height="562">
+  <columns>
+    <rows SIZE="400">
+      <widget NAME="strips" size="292"/>
+      <widget NAME="alarms" size="260"/>
+    </rows>
+    <rows>
+      <widget NAME="map2d" size="195"/>
+      <widget NAME="aircraft" size="357"/>
+    </rows>
+  </columns>
 </layout>

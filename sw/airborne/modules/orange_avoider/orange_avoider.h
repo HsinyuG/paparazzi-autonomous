@@ -16,6 +16,16 @@
 // settings
 extern float oa_color_count_frac;
 
+extern float maxDistance;
+extern bool random_rotate_avoid;
+extern bool compare_middle_left_right;
+extern bool enable_bounds_detect;
+extern uint16_t threshold_move_back;
+extern float proportion_move_back;
+extern float proportion_predict;
+extern float ang_vel;
+
+
 // functions
 extern void orange_avoider_init(void);
 extern void orange_avoider_periodic(void);
