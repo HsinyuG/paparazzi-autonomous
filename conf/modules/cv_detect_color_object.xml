@@ -30,8 +30,20 @@
   <settings>
     <dl_settings>
       <dl_settings name="ColorObjectDetector">
+         <dl_setting MAX="2" MIN="0" STEP="1" values="GREEN_DETECTOR|GROUND_DETECTOR|EDGE_DETECTOR" VAR="detection_mode">
+          <strip_button name="GREEN_DETECTOR" value="0"/>
+          <strip_button name="GROUND_DETECTOR" value="1"/>
+          <strip_button name="EDGE_DETECTOR" value="2"/>
+        </dl_setting>
+         <!-- ground detection -->
          <dl_setting var="threshold_middle" min="0" step="100" max="10000"/>
          <dl_setting var="threshold_sideways" min="0" step="100" max="10000"/>
+         <!-- green detection -->
+         <dl_setting var="middle_threshold_proportion" min="0" step="0.01" max="1" shortname="middle_th"/>
+         <dl_setting var="sideways_threshold_proportion" min="0" step="0.01" max="1" shortname="side_th"/>
+         <dl_setting var="image_middle_proportion" min="0" step="0.01" max="1"/>
+         <dl_setting var="green_bottom_height" min="0" step="1" max="240"/>
+
          <dl_setting var="cod_lum_min1" min="0" step="1" max="255" shortname="y_min1"/>
          <dl_setting var="cod_lum_max1" min="0" step="1" max="255" shortname="y_max1"/>
          <dl_setting var="cod_cb_min1"   min="0" step="1" max="255" shortname="u_min1"/>

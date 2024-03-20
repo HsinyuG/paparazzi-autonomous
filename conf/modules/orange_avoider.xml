@@ -39,7 +39,7 @@ so you have to define which filter to use with the ORANGE_AVOIDER_VISUAL_DETECTI
     <file name="orange_avoider.h"/>
   </header>
   <init fun="green_tracker_init()"/>
-  <periodic fun="green_tracker_periodic()" freq="4"/>
+  <periodic fun="green_tracker_periodic()" freq="20"/>
   <makefile target="ap|nps">
     <file name="orange_avoider.c"/>
   </makefile>

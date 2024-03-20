@@ -47,6 +47,16 @@
 #define ACTION_RIGHT 4
 #endif
 
+#ifndef GREEN_DETECTOR
+#define GREEN_DETECTOR 0
+#endif
+#ifndef GROUND_DETECTOR
+#define GROUND_DETECTOR 1
+#endif
+#ifndef EDGE_DETECTOR
+#define EDGE_DETECTOR 2
+#endif
+
 // Module settings
 extern uint8_t cod_lum_min1;
 extern uint8_t cod_lum_max1;
@@ -68,6 +78,12 @@ extern bool cod_draw2;
 
 extern uint32_t threshold_middle;
 extern uint32_t threshold_sideways;
+
+extern float image_middle_proportion;
+extern float middle_threshold_proportion;
+extern float sideways_threshold_proportion;
+extern uint8_t green_bottom_height;
+extern uint8_t detection_mode;
 
 // Module functions
 extern void color_object_detector_init(void);

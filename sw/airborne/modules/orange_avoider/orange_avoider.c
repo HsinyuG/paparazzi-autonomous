@@ -112,12 +112,12 @@ static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
   // green_detect_result = quality;
 }
 
-static void bottom_detection_cb(uint8_t __attribute__((unused)) sender_id,
+static void ground_detection_cb(uint8_t __attribute__((unused)) sender_id,
                                int16_t __attribute__((unused)) pixel_x, int16_t __attribute__((unused)) pixel_y,
-                               int16_t __attribute__((unused)) pixel_width, int16_t pixel_height,
-                               int32_t __attribute__((unused)) quality, int16_t __attribute__((unused)) extra)
+                               int16_t __attribute__((unused)) pixel_width, int16_t __attribute__((unused)) pixel_height,
+                               int32_t __attribute__((unused)) quality, int16_t  extra)
 {
-  green_detect_result = pixel_height;
+  green_detect_result = extra;
 }
 
 static void green_detection_cb(uint8_t __attribute__((unused)) sender_id,
@@ -155,7 +155,7 @@ void green_tracker_init(void)
 
   // bind our colorfilter callbacks to receive the color filter outputs
   // AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, green_detection_cb);
-  AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, bottom_detection_cb);
+  AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, ground_detection_cb);
 
   #ifdef FORWARD_VEL
   maxDistance = MAX_DISTANCE;
@@ -406,6 +406,7 @@ void green_tracker_periodic(void)
     count_left, count_right, threshold_sideways, count_middle, threshold_middle);
   **/
   printf("mode: %u ----- ", autopilot_mode_auto2);
+  printf("detector: %u ----- ", detection_mode);
   printf("state: %d ----- ", navigation_state);
   printf("detection: %d ----- \n", green_detect_result);
   // printf("disp = %f at %d\n", total_displacement, now_ts);
