@@ -41,13 +41,14 @@ static uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters);
 static uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters);
 static uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor);
 static uint8_t increase_nav_heading(float incrementDegrees);
-static uint8_t chooseRandomIncrementAvoidance(int16_t strategy);
+static uint8_t chooseRandomIncrementAvoidance(void);
 
 enum navigation_state_t {
   SAFE,
   OBSTACLE_FOUND,
   SEARCH_FOR_SAFE_HEADING,
-  OUT_OF_BOUNDS
+  OUT_OF_BOUNDS,
+  MOVE_BACK
 };
 
 // define settings
@@ -56,12 +57,33 @@ float oa_color_count_frac = 0.18f;
 // define and initialise global variables
 enum navigation_state_t navigation_state = SEARCH_FOR_SAFE_HEADING;
 int32_t color_count = 0;                // orange color count from color filter for obstacle detection
-int16_t strategy = 0;                   // a variable to get the strategy from the cv detect file
 int16_t obstacle_free_confidence = 0;   // a measure of how certain we are that the way ahead is safe.
-float heading_increment = 5.f;          // heading angle increment [deg]
-float maxDistance = 2.25;               // max waypoint displacement [m]
+float heading_increment = 1.f;          // heading angle increment [deg]
+float maxDistance = 2.25;                // max waypoint displacement [m] 2.25
+int16_t green_tracker_direction = ACTION_FORWARD;    //initial direction(ACTION_FORWARD)
+int16_t green_detect_result = ACTION_FORWARD;
+int32_t degree_to_rotate = 0;
+uint32_t count_middle = 0;
+uint32_t count_left = 0;
+uint32_t count_right = 0;
 
 const int16_t max_trajectory_confidence = 5; // number of consecutive negative object detections to be sure we are obstacle free
+
+bool random_rotate_avoid = true; // = true's reason: difficult to make sure the obstacle avoid is not triggerrd before out of bound when facing outside, and if keeps rotate deterministic it will face dead lock
+bool compare_middle_left_right = false; // true --> feasible direction not only requrire middle > threshold, but also require middle > left and right
+bool enable_bounds_detect = false; // true --> enable OUT_OF_BOUNDS state detection
+
+uint16_t count_move_back = 0;
+uint16_t threshold_move_back = 2;
+float proportion_move_back = 0.05f;
+
+float proportion_predict = 0.5f;
+
+float total_displacement = 0.0f;
+float last_x = 0.0f;
+float last_y = 0.0f;
+
+float ang_vel = 3.14f;
 
 /*
  * This next section defines an ABI messaging event (http://wiki.paparazziuav.org/wiki/ABI), necessary
@@ -74,13 +96,35 @@ const int16_t max_trajectory_confidence = 5; // number of consecutive negative o
 #define ORANGE_AVOIDER_VISUAL_DETECTION_ID ABI_BROADCAST
 #endif
 static abi_event color_detection_ev;
+static abi_event green_detection_ev;
 static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
                                int16_t __attribute__((unused)) pixel_x, int16_t __attribute__((unused)) pixel_y,
                                int16_t __attribute__((unused)) pixel_width, int16_t __attribute__((unused)) pixel_height,
                                int32_t quality, int16_t __attribute__((unused)) extra)
 {
-  color_count = quality;
-  strategy = pixel_height;
+  // green_detect_result = quality;
+}
+
+static void bottom_detection_cb(uint8_t __attribute__((unused)) sender_id,
+                               int16_t __attribute__((unused)) pixel_x, int16_t __attribute__((unused)) pixel_y,
+                               int16_t __attribute__((unused)) pixel_width, int16_t pixel_height,
+                               int32_t __attribute__((unused)) quality, int16_t __attribute__((unused)) extra)
+{
+  green_detect_result = pixel_height;
+}
+
+static void green_detection_cb(uint8_t __attribute__((unused)) sender_id,
+                               int16_t pixel_x, int16_t pixel_y,
+                               int16_t pixel_width, int16_t pixel_height,
+                               int32_t quality, int16_t extra)
+{
+  count_middle = pixel_x;
+  count_left = pixel_y;
+  count_right = pixel_width;
+  threshold_sideways = pixel_height;
+  threshold_middle = quality;
+  green_detect_result = extra;
+  // printf("green_detect_result = %d\n", green_detect_result);
 }
 
 /*
@@ -90,12 +134,23 @@ void orange_avoider_init(void)
 {
   // Initialise random values
   srand(time(NULL));
-  chooseRandomIncrementAvoidance(strategy);
+  chooseRandomIncrementAvoidance();
 
   // bind our colorfilter callbacks to receive the color filter outputs
   AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
 }
+// SOMETHING CHANGJUN ADDED
+void green_tracker_init(void)
+{
+  // Initialise random values
+  srand(time(NULL));
+  chooseRandomIncrementAvoidance();
 
+  // bind our colorfilter callbacks to receive the color filter outputs
+  // AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, green_detection_cb);
+  AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, bottom_detection_cb);
+}
+//END of CHANGJUN ADDED PART 
 /*
  * Function that checks it is safe to move forwards, and then moves a waypoint forward or changes the heading
  */
@@ -109,8 +164,7 @@ void orange_avoider_periodic(void)
   // compute current color thresholds
   int32_t color_count_threshold = oa_color_count_frac * front_camera.output_size.w * front_camera.output_size.h;
 
-  //VERBOSE_PRINT("Color_count: %d  threshold: %d state: %d \n", color_count, color_count_threshold, navigation_state);
-  
+  VERBOSE_PRINT("Color_count: %d  threshold: %d state: %d \n", color_count, color_count_threshold, navigation_state);
 
   // update our safe confidence using color threshold
   if(color_count < color_count_threshold){
@@ -122,21 +176,18 @@ void orange_avoider_periodic(void)
   // bound obstacle_free_confidence
   Bound(obstacle_free_confidence, 0, max_trajectory_confidence);
 
-  float moveDistance = maxDistance;
-  float moveDistance_out = 0.5*moveDistance;
-  printf("the current control strategy of the drone is %d\n",strategy);
-  printf("the current state is %d\n",navigation_state);
+  float moveDistance = fminf(maxDistance, 0.2f * obstacle_free_confidence);
 
   switch (navigation_state){
     case SAFE:
       // Move waypoint forward
-      moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance_out);
+      moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance);
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         navigation_state = OUT_OF_BOUNDS;
-      } else if (strategy != 0){
+      } else if (obstacle_free_confidence == 0){
         navigation_state = OBSTACLE_FOUND;
       } else {
-        moveWaypointForward(WP_GOAL, 2*moveDistance);
+        moveWaypointForward(WP_GOAL, moveDistance);
       }
 
       break;
@@ -146,22 +197,16 @@ void orange_avoider_periodic(void)
       waypoint_move_here_2d(WP_TRAJECTORY);
 
       // randomly select new search direction
-      chooseRandomIncrementAvoidance(strategy);
-      printf("the current heading increment is %f /n",heading_increment);
+      chooseRandomIncrementAvoidance();
 
       navigation_state = SEARCH_FOR_SAFE_HEADING;
-      
+
       break;
     case SEARCH_FOR_SAFE_HEADING:
-      printf("now we are in state 3, the strategy is %d",strategy);
-      chooseRandomIncrementAvoidance(strategy);
       increase_nav_heading(heading_increment);
-      moveWaypointForward(WP_GOAL, 0.5*moveDistance);
-
 
       // make sure we have a couple of good readings before declaring the way safe
-      if (strategy == 0){
-      	printf("the strategy change to safe");
+      if (obstacle_free_confidence >= 2){
         navigation_state = SAFE;
       }
       break;
@@ -185,7 +230,135 @@ void orange_avoider_periodic(void)
   }
   return;
 }
+// SOMETHING CHANGJUN ADDED
+void green_tracker_periodic(void)
+{
+  // only evaluate our state machine if we are flying
+  if(!autopilot_in_flight()){
+    return;
+  }
+  float moveDistance = maxDistance;
+  switch (navigation_state){
+    case SAFE:
+      // Move waypoint forward
+      moveWaypointForward(WP_TRAJECTORY, proportion_predict * moveDistance); // 1.5f *  ; 0.75f + 
 
+      if ( ((green_detect_result != ACTION_FORWARD) && compare_middle_left_right) ||\
+        ((green_detect_result == ACTION_LEFT || green_detect_result == ACTION_RIGHT) && !compare_middle_left_right))
+      { // it should be able to detect the boundary as well
+        green_tracker_direction = green_detect_result;
+
+        navigation_state = OBSTACLE_FOUND;
+      } 
+      else if ( (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))) && enable_bounds_detect )
+      { // only necessary if outside someone holding a green cloth
+        chooseRandomIncrementAvoidance();
+        // green_tracker_direction = green_detect_result;
+        navigation_state = OUT_OF_BOUNDS;
+      }  
+      else {
+        moveWaypointForward(WP_GOAL, moveDistance);
+      }
+
+      break;
+    case OBSTACLE_FOUND:
+      // stop
+      waypoint_move_here_2d(WP_GOAL);
+      waypoint_move_here_2d(WP_TRAJECTORY);
+      // Obstacle_found then change yaw velocity:
+      if (!random_rotate_avoid) {
+        switch (green_tracker_direction)
+        {
+          case ACTION_LEFT:
+            heading_increment = 1.0f; //10.0f;
+            break;
+          case ACTION_RIGHT:
+            heading_increment = -1.0f; //-10.0f;
+            break;
+          case ACTION_FORWARD_LEFT:
+            heading_increment = 0.5f; //5.0f;
+            break;
+          case ACTION_FORWARD_RIGHT:
+            heading_increment = -0.5f; //-5.0f;
+            break;
+          default:
+            break;
+        }
+      }
+      else {
+        // randomly select new search direction
+        chooseRandomIncrementAvoidance();
+      }
+      
+
+
+      navigation_state = MOVE_BACK;
+
+      break;
+    case SEARCH_FOR_SAFE_HEADING: // continue on certain direction to turn, to prevent conflict direction in OBSTACLE_FOUND after OUT_OF_BOUNDS
+      increase_nav_heading(5.f * heading_increment);
+      // guidance_h_set_heading_rate(heading_increment * ang_vel);
+
+      // make sure we have a couple of good readings before declaring the way safe
+      // if (obstacle_free_confidence >= 2){
+      //   navigation_state = SAFE;
+      if ( ((green_detect_result == ACTION_FORWARD) && compare_middle_left_right) ||\
+        ((green_detect_result != ACTION_LEFT && green_detect_result != ACTION_RIGHT) && !compare_middle_left_right))
+      {
+        navigation_state = SAFE;
+      }
+      break;
+    case OUT_OF_BOUNDS: // use the detect result to determine the changing direction, to avoid conflic direction with obstacle avoid? No, will cause deadlock --> obstacle avoid also random direction
+      // stop
+      waypoint_move_here_2d(WP_GOAL);
+      waypoint_move_here_2d(WP_TRAJECTORY);
+
+      increase_nav_heading(heading_increment);
+      // moveWaypointForward(WP_TRAJECTORY, 1.5f); // has bug: max distance + 0.75 out of boundary, but this one still in, so immediately jump out
+      moveWaypointForward(WP_TRAJECTORY, 0.75f + moveDistance);
+
+      if (InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
+        // add offset to head back into arena
+        increase_nav_heading(heading_increment);
+
+        // reset safe counter
+        // obstacle_free_confidence = 0;
+
+        // ensure direction is safe before continuing
+        navigation_state = MOVE_BACK;
+      }
+      break;
+    case MOVE_BACK: // not considering move back and out of bounds, because we come from that direction
+        moveWaypointForward(WP_GOAL, - proportion_move_back * moveDistance);
+        moveWaypointForward(WP_TRAJECTORY, - proportion_move_back * moveDistance);
+        if (count_move_back >= threshold_move_back) {
+          navigation_state = SEARCH_FOR_SAFE_HEADING;
+          waypoint_move_here_2d(WP_GOAL);
+          waypoint_move_here_2d(WP_TRAJECTORY);
+          count_move_back = 0;
+        }
+        count_move_back ++;
+
+      break;
+    default:
+      break;
+  }
+  /**
+  float now_ts = (float)get_sys_time_usec() / 100000.f;
+  update_odometry();
+  // debug message
+  printf("L = %d ----- R = %d ----- THS = %d ----- M = %d ----- THM = %d ----- ", \
+    count_left, count_right, threshold_sideways, count_middle, threshold_middle);
+  **/
+  printf("state: %d ----- ", navigation_state);
+  printf("detection: %d ----- \n", green_detect_result);
+  // printf("disp = %f at %d\n", total_displacement, now_ts);
+  // printf("deterministic cmd: %d\n", green_tracker_direction);
+  
+  return;
+  
+}
+//END of CHANGJUN ADDED PART 
 /*
  * Increases the NAV heading. Assumes heading is an INT32_ANGLE. It is bound in this function.
  */
@@ -199,9 +372,10 @@ uint8_t increase_nav_heading(float incrementDegrees)
   // set heading, declared in firmwares/rotorcraft/navigation.h
   nav.heading = new_heading;
 
-  VERBOSE_PRINT("Increasing heading to %f\n", DegOfRad(new_heading));
+  // VERBOSE_PRINT("Increasing heading to %f\n", DegOfRad(new_heading));
   return false;
 }
+
 
 /*
  * Calculates coordinates of distance forward and sets waypoint 'waypoint' to those coordinates
@@ -224,9 +398,9 @@ uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters)
   // Now determine where to place the waypoint you want to go to
   new_coor->x = stateGetPositionEnu_i()->x + POS_BFP_OF_REAL(sinf(heading) * (distanceMeters));
   new_coor->y = stateGetPositionEnu_i()->y + POS_BFP_OF_REAL(cosf(heading) * (distanceMeters));
-  VERBOSE_PRINT("Calculated %f m forward position. x: %f  y: %f based on pos(%f, %f) and heading(%f)\n", distanceMeters,	
-                POS_FLOAT_OF_BFP(new_coor->x), POS_FLOAT_OF_BFP(new_coor->y),
-                stateGetPositionEnu_f()->x, stateGetPositionEnu_f()->y, DegOfRad(heading));
+  // VERBOSE_PRINT("Calculated %f m forward position. x: %f  y: %f based on pos(%f, %f) and heading(%f)\n", distanceMeters,	
+                // POS_FLOAT_OF_BFP(new_coor->x), POS_FLOAT_OF_BFP(new_coor->y),
+                // stateGetPositionEnu_f()->x, stateGetPositionEnu_f()->y, DegOfRad(heading));
   return false;
 }
 
@@ -235,8 +409,8 @@ uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters)
  */
 uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor)
 {
-  VERBOSE_PRINT("Moving waypoint %d to x:%f y:%f\n", waypoint, POS_FLOAT_OF_BFP(new_coor->x),
-                POS_FLOAT_OF_BFP(new_coor->y));
+  // VERBOSE_PRINT("Moving waypoint %d to x:%f y:%f\n", waypoint, POS_FLOAT_OF_BFP(new_coor->x),
+                // POS_FLOAT_OF_BFP(new_coor->y));
   waypoint_move_xy_i(waypoint, new_coor->x, new_coor->y);
   return false;
 }
@@ -244,16 +418,24 @@ uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor)
 /*
  * Sets the variable 'heading_increment' randomly positive/negative
  */
-uint8_t chooseRandomIncrementAvoidance(int16_t strategy)
+uint8_t chooseRandomIncrementAvoidance(void)
 {
   // Randomly choose CW or CCW avoiding direction
-  if (strategy == 2) {
-    heading_increment = 10.f;
-    VERBOSE_PRINT("Set avoidance increment to: %f\n", heading_increment);
+  if (rand() % 2 == 0) {
+    heading_increment = 1.f;
+    // VERBOSE_PRINT("Set avoidance increment to: %f\n", heading_increment);
   } else {
-    heading_increment = -10.f;
-    VERBOSE_PRINT("Set avoidance increment to: %f\n", heading_increment);
+    heading_increment = -1.f;
+    // VERBOSE_PRINT("Set avoidance increment to: %f\n", heading_increment);
   }
   return false;
 }
 
+void update_odometry(void)
+{
+  float x = stateGetPositionEnu_i()->x; // mm
+  float y = stateGetPositionEnu_i()->y;
+  total_displacement += sqrt((x - last_x) * (x - last_x) + (y - last_y) * (y - last_y)) / 100.f;
+  last_x = x;
+  last_y = y;
+}

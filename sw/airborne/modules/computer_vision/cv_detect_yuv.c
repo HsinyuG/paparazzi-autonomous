@@ -26,7 +26,8 @@
  */
 
 // Own header
-#include "modules/computer_vision/cv_detect_color_object.h"
+// #include "modules/computer_vision/cv_detect_color_object.h"
+#include "modules/computer_vision/cv_detect_yuv.h"
 #include "modules/computer_vision/cv.h"
 #include "modules/core/abi.h"
 #include "std.h"
@@ -70,6 +71,9 @@ uint8_t cod_cr_max2 = 0;
 bool cod_draw1 = false;
 bool cod_draw2 = false;
 
+uint32_t threshold_middle = 8000;
+uint32_t threshold_sideways = 5000;
+
 // define global variables
 struct color_object_t {
   int32_t x_c;
@@ -81,6 +85,17 @@ struct color_object_t {
   uint16_t vd[256];
   uint8_t strategy;
 };
+
+// struct detect_result_t {
+//   uint32_t count_middle;
+//   uint32_t count_left;
+//   uint32_t count_right;
+//   uint32_t threshold_middle;
+//   uint32_t threshold_sideways;
+//   uint32_t action_count;
+//   bool updated;
+// };
+
 struct color_object_t global_filters[2];
 
 // Function
@@ -330,24 +345,34 @@ uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool
 
   // choose the biggest relationship and set the strategy
   printf("the current sum of the three part of the image is %d, %d, %d", sum_left,sum_mid,sum_right);
-  uint32_t biggest_direction = sum_mid;
-  *strategy = 0;
-  if (sum_left<5000000){
-    *strategy = 2;
-    return cnt;
+  // uint32_t biggest_direction = sum_mid;
+  
+  if (sum_mid < threshold_middle * 1000 || sum_left < threshold_sideways * 1000 || sum_right < threshold_sideways * 1000)  {
+      if (sum_left < sum_right){
+        *strategy = ACTION_RIGHT;
+      }
+      else {
+        *strategy = ACTION_LEFT;
+      } 
   }
-  if (sum_right<5000000){
-    *strategy = 1;
-    return cnt;
-  } 
-  if (sum_left>biggest_direction){
-    biggest_direction = sum_left;
-    *strategy = 1;
+  else {
+    if (sum_left > sum_right && sum_left > sum_mid) {
+      *strategy = ACTION_FORWARD_LEFT;
+    }
+    else if (sum_right > sum_left && sum_right > sum_mid) {
+      *strategy = ACTION_FORWARD_RIGHT;
+    }
+    else {*strategy = ACTION_FORWARD;}
   }
-  if (sum_right > biggest_direction){
-    biggest_direction = sum_right;
-    *strategy = 2;
-  }
+  // if 
+  // if (sum_left>biggest_direction){
+  //   biggest_direction = sum_left;
+  //   *strategy = 1;
+  // }
+  // if (sum_right > biggest_direction){
+  //   biggest_direction = sum_right;
+  //   *strategy = 2;
+  // }
   //printf("the current strategy is %d\n", *strategy);
   
   return cnt;

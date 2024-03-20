@@ -31,6 +31,22 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifndef ACTION_LEFT
+#define ACTION_LEFT 0
+#endif
+#ifndef ACTION_FORWARD_LEFT
+#define ACTION_FORWARD_LEFT 1
+#endif
+#ifndef ACTION_FORWARD
+#define ACTION_FORWARD 2
+#endif
+#ifndef ACTION_FORWARD_RIGHT
+#define ACTION_FORWARD_RIGHT 3
+#endif
+#ifndef ACTION_RIGHT
+#define ACTION_RIGHT 4
+#endif
+
 // Module settings
 extern uint8_t cod_lum_min1;
 extern uint8_t cod_lum_max1;
@@ -48,6 +64,10 @@ extern uint8_t cod_cr_max2;
 
 extern bool cod_draw1;
 extern bool cod_draw2;
+
+
+extern uint32_t threshold_middle;
+extern uint32_t threshold_sideways;
 
 // Module functions
 extern void color_object_detector_init(void);
