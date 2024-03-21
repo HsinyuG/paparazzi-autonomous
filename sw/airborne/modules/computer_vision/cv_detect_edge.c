@@ -314,16 +314,16 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
     // printf("y: %u, ", current_y);
     // printf("i: %u, ", current_index);
     // printf("edge: %u; ", edge[current_index]);
-  if (current_y > start_index && current_y < end_index) // only use the middle part of the image
-  {
-    // if no values assigned to row, assign first edge
-    if ((first_edge_x_each_row[current_y]==cols+1) && !edge[current_index]) {
-      first_edge_x_each_row[current_y] = current_x;
-      // printf("x: %u, ", current_x);
-      // printf("y: %u, ", current_y);
-    }
+    if (current_y > start_index && current_y < end_index) // only use the middle part of the image
+    {
+      // if no values assigned to row, assign first edge
+      if ((first_edge_x_each_row[current_y]==cols+1) && !edge[current_index]) {
+        first_edge_x_each_row[current_y] = current_x;
+        // printf("x: %u, ", current_x);
+        // printf("y: %u, ", current_y);
+      }
 
-  }
+    }
     // if no edge found after iterating through all columns, assin first column as edge
     if (current_x == cols-1 && first_edge_x_each_row[current_y] == cols+1) {
       first_edge_x_each_row[current_y] = 0;
