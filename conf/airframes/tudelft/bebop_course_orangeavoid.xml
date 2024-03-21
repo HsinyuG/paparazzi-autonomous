@@ -31,8 +31,10 @@
       <!-- control -->
       <define name="MAX_DISTANCE" value="2.25"/>
       <define name="FORWARD_VEL" value="0.5"/>
-      <define name="BACKWARD_VEL" value="0.5"/>
-      <define name="THRESHOLD_MOVE_BACK" value="2"/>
+      <define name="BACKWARD_VEL" value="0.8"/> 
+      <!-- 0.5 -->
+      <define name="THRESHOLD_MOVE_BACK" value="8"/> 
+      <!-- 2 -->
       <define name="PROPORTION_MOVE_BACK" value="0.05"/>
       <define name="PROPORTION_PREDICT" value="0.5"/>
       <define name="ANG_VEL" value="1.57"/>
@@ -43,6 +45,13 @@
       <!-- perception -->
       <define name="THRESHOLD_MIDDLE" value="8000"/>
       <define name="THRESHOLD_SIDEWAYS" value="5000"/>
+
+      <define name="GREEN_BOTTOM_HEIGHT" value="80"/>
+      <define name="IMAGE_MIDDLE_PROPORTION" value="0.33"/>
+      <define name="MIDDLE_THRESHOLD_PROPORTION" value="0.5"/>
+      <define name="SIDEWAYS_THRESHOLD_PROPORTION" value="0.2"/>
+
+      <define name="DETECTION_MODE" value="0"/>
 
     </target>
     <target name="nps" board="pc">
