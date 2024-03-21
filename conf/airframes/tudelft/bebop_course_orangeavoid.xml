@@ -49,6 +49,7 @@
       <define name="RANDOM_ROTATE_AVOID" value="TRUE"/>
       <define name="COMPARE_MIDDLE_LEFT_RIGHT" value="FALSE"/>
       <define name="ENABLE_BOUNDS_DETECT" value="FALSE"/>
+      <define name="SLIGHT_TURN" value="TRUE"/>
 
       <!-- perception -->
       <define name="DETECTION_MODE" value="0"/>
@@ -104,6 +105,7 @@
       <define name="RANDOM_ROTATE_AVOID" value="TRUE"/>
       <define name="COMPARE_MIDDLE_LEFT_RIGHT" value="FALSE"/>
       <define name="ENABLE_BOUNDS_DETECT" value="FALSE"/>
+      <define name="SLIGHT_TURN" value="TRUE"/>
 
       <!-- perception -->
       <define name="DETECTION_MODE" value="0"/>

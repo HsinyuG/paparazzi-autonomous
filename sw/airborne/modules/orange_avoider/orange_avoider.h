@@ -21,6 +21,7 @@ extern float maxDistance;
 extern bool random_rotate_avoid;
 extern bool compare_middle_left_right;
 extern bool enable_bounds_detect;
+extern bool slight_turn;
 extern uint16_t threshold_move_back;
 extern float proportion_move_back;
 extern float proportion_predict;

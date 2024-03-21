@@ -27,6 +27,7 @@ so you have to define which filter to use with the ORANGE_AVOIDER_VISUAL_DETECTI
         <dl_setting var="random_rotate_avoid"  min="0" step="1" max="1" values="False|True"/>
         <dl_setting var="compare_middle_left_right"  min="0" step="1" max="1" values="False|True"/>
         <dl_setting var="enable_bounds_detect"  min="0" step="1" max="1" values="False|True"/>
+        <dl_setting var="slight_turn"  min="0" step="1" max="1" values="False|True"/>
         <!-- <dl_setting var="use_vel_control"  min="0" step="1" max="1" values="False|True"/> -->
       </dl_settings>
     </dl_settings>
