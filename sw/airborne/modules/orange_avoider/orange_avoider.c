@@ -87,12 +87,18 @@ static void color_detection_cb(uint8_t __attribute__((unused)) sender_id,
 
 uint16_t highest_column_index;
 uint16_t first_edge_height;
+
+uint16_t shortest_column_index;
+uint16_t shortest_edge_height;
+
 static abi_event edge_detection_ev;
 static void edge_detection_cb(uint8_t __attribute__((unused)) sender_id,
                                int16_t __attribute__((unused)) pixel_x, int16_t __attribute__((unused)) pixel_y,
-                               int16_t __attribute__((unused)) pixel_width, int16_t __attribute__((unused)) pixel_height,
+                               int16_t pixel_width, int16_t pixel_height,
                                int32_t quality, int16_t extra)
 {
+  shortest_edge_height = (uint16_t)pixel_width;
+  shortest_column_index = (uint16_t)pixel_height;
   first_edge_height = (uint16_t)quality; // (0, 240)
   highest_column_index = (uint16_t)extra; // (0, 520)
 }
@@ -220,10 +226,11 @@ void edge_avoider_periodic(void)
     case SAFE:
       // Move waypoint forward
       // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, 0.5f);
-      moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, - (float)highest_column_index/(float)img_width + 0.5f); // direction from 
+      // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, - (float)highest_column_index/(float)img_width + 0.5f); // direction from 
+      moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance);
       if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         navigation_state = OUT_OF_BOUNDS;
-      } else if (first_edge_height <= free_space_threshold){
+      } else if (shortest_edge_height <= free_space_threshold){
         navigation_state = OBSTACLE_FOUND; // no direction to go in current yaw
       } else {
         
@@ -231,8 +238,9 @@ void edge_avoider_periodic(void)
         // difference in removing this is not obvious
         // increase_nav_heading(angular_vel * (float)(highest_column_index - img_width/2));
         
-        moveWaypointDirection(WP_GOAL, moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
+        // moveWaypointDirection(WP_GOAL, moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
         // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, 0.5f);
+        moveWaypointForward(WP_GOAL, moveDistance);
         // increase_nav_heading(angular_vel * (float)(highest_column_index - img_width/2)); // not minus because the yaw seems CW as +
         // printf("angle to increase: %f", angular_vel * (highest_column_index - img_width/2))
       }
@@ -253,14 +261,14 @@ void edge_avoider_periodic(void)
       increase_nav_heading(heading_increment);
 
       // make sure we have a couple of good readings before declaring the way safe
-      if (first_edge_height >= free_space_threshold){
+      if (shortest_edge_height > free_space_threshold){
         navigation_state = SAFE;
       }
       break;
     case OUT_OF_BOUNDS: // keep rotating when prediction is outside the arena, and when inside, rotate a little more
       increase_nav_heading(heading_increment);
-      // moveWaypointForward(WP_TRAJECTORY, 1.5f);
-      moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
+      moveWaypointForward(WP_TRAJECTORY, 1.5f);
+      // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, - (float)highest_column_index/(float)img_width + 0.5f);
       // moveWaypointDirection(WP_TRAJECTORY, 1.5f * moveDistance, 0.5f);
 
       if (InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){

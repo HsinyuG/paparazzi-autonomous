@@ -40,6 +40,8 @@ extern float sigma2;
 extern float tlow2;
 extern float thigh2;
 
+extern float edge_detect_proportion;
+
 extern bool cod_draw1;
 extern bool cod_draw2;
 
