@@ -20,12 +20,20 @@
       <!-- <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="190"/> -->
 
       <!-- Detect green -->
-      <define name="COLOR_OBJECT_DETECTOR_LUM_MIN1" value="70"/>
-      <define name="COLOR_OBJECT_DETECTOR_LUM_MAX1" value="150"/>
-      <define name="COLOR_OBJECT_DETECTOR_CB_MIN1" value="70"/>
-      <define name="COLOR_OBJECT_DETECTOR_CB_MAX1" value="100"/>
-      <define name="COLOR_OBJECT_DETECTOR_CR_MIN1" value="100"/>
-      <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="125"/>
+      <define name="COLOR_OBJECT_DETECTOR_LUM_MIN2" value="60"/>
+      <define name="COLOR_OBJECT_DETECTOR_LUM_MAX2" value="130"/>
+      <define name="COLOR_OBJECT_DETECTOR_CB_MIN2" value="75"/>
+      <define name="COLOR_OBJECT_DETECTOR_CB_MAX2" value="110"/>
+      <define name="COLOR_OBJECT_DETECTOR_CR_MIN2" value="120"/>
+      <define name="COLOR_OBJECT_DETECTOR_CR_MAX2" value="140"/>
+
+      <!-- <define name="COLOR_OBJECT_DETECTOR_LUM_MIN2" value="120"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_LUM_MAX2" value="160"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CB_MIN2" value="75"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CB_MAX2" value="110"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CR_MIN2" value="120"/> -->
+      <!-- <define name="COLOR_OBJECT_DETECTOR_CR_MAX2" value="140"/> -->
+
       <define name="COLOR_OBJECT_DETECTOR_BOTTOM_HEIGHT1" value="80"/>
 
       <!-- control -->
@@ -43,15 +51,21 @@
       <define name="ENABLE_BOUNDS_DETECT" value="FALSE"/>
 
       <!-- perception -->
-      <define name="THRESHOLD_MIDDLE" value="8000"/>
-      <define name="THRESHOLD_SIDEWAYS" value="5000"/>
-
+      <define name="DETECTION_MODE" value="0"/>
+      <!-- ground detector -->
+      <define name="THRESHOLD_MIDDLE" value="14000"/>
+      <define name="THRESHOLD_SIDEWAYS" value="10000"/>
+      <!-- green detector -->
       <define name="GREEN_BOTTOM_HEIGHT" value="80"/>
       <define name="IMAGE_MIDDLE_PROPORTION" value="0.33"/>
       <define name="MIDDLE_THRESHOLD_PROPORTION" value="0.5"/>
       <define name="SIDEWAYS_THRESHOLD_PROPORTION" value="0.2"/>
-
-      <define name="DETECTION_MODE" value="0"/>
+      <!-- edge detector -->
+      <define name="EDGE_DETECTOR_SIGMA1" value="0.6"/>
+      <define name="EDGE_DETECTOR_TLOW1" value="0.5"/>
+      <define name="EDGE_DETECTOR_THIGH1" value="0.8"/>   
+      <define name="PIXEL_VAR_THRESHOLD" value="3"/>  
+      <define name="EDGE_DETECT_PROPORTION" value="0.8"/>  
 
     </target>
     <target name="nps" board="pc">
@@ -74,6 +88,7 @@
       <define name="COLOR_OBJECT_DETECTOR_CB_MAX1" value="100"/>
       <define name="COLOR_OBJECT_DETECTOR_CR_MIN1" value="100"/>
       <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="125"/>
+
       <define name="COLOR_OBJECT_DETECTOR_BOTTOM_HEIGHT1" value="80"/>
 
       <!-- control -->
@@ -91,15 +106,21 @@
       <define name="ENABLE_BOUNDS_DETECT" value="FALSE"/>
 
       <!-- perception -->
+      <define name="DETECTION_MODE" value="0"/>
+      <!-- ground detector -->
       <define name="THRESHOLD_MIDDLE" value="8000"/>
       <define name="THRESHOLD_SIDEWAYS" value="5000"/>
-
+      <!-- green detector -->
       <define name="GREEN_BOTTOM_HEIGHT" value="80"/>
       <define name="IMAGE_MIDDLE_PROPORTION" value="0.33"/>
       <define name="MIDDLE_THRESHOLD_PROPORTION" value="0.5"/>
       <define name="SIDEWAYS_THRESHOLD_PROPORTION" value="0.2"/>
-
-      <define name="DETECTION_MODE" value="0"/>
+      <!-- edge detector -->
+      <define name="EDGE_DETECTOR_SIGMA1" value="3.0"/>
+      <define name="EDGE_DETECTOR_TLOW1" value="0.5"/>
+      <define name="EDGE_DETECTOR_THIGH1" value="0.95"/>   
+      <define name="PIXEL_VAR_THRESHOLD" value="3"/>  
+      <define name="EDGE_DETECT_PROPORTION" value="0.8"/>  
 
     </target>
     
@@ -142,8 +163,7 @@
     <module name="orange_avoider">
       <define name="ORANGE_AVOIDER_VISUAL_DETECTION_ID" value="COLOR_OBJECT_DETECTION1_ID"/>
     </module>
-    <module name="video_rtp_stream">
-      <define name="VIEWVIDEO_CAMERA" value="front_camera"/>
+    <module name="video_rtp_stream">      <define name="VIEWVIDEO_CAMERA" value="front_camera"/>
       <define name="VIEWVIDEO_CAMERA2" value="bottom_camera"/>
       <define name="VIEWVIDEO_DOWNSIZE_FACTOR" value="1"/>
       <define name="VIEWVIDEO_QUALITY_FACTOR" value="40"/>

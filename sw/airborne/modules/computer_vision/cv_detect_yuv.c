@@ -29,6 +29,9 @@
 // #include "modules/computer_vision/cv_detect_color_object.h"
 #include "modules/computer_vision/cv_detect_yuv.h"
 #include "modules/computer_vision/cv.h"
+#include "modules/computer_vision/edge_detection/canny_edge.c"
+#include "modules/computer_vision/edge_detection/hysteresis.c"
+#include "modules/computer_vision/edge_detection/pgm_io.c"
 #include "modules/core/abi.h"
 #include "std.h"
 
@@ -79,7 +82,25 @@ float image_middle_proportion = 0.33f;
 float middle_threshold_proportion = 0.5f;
 float sideways_threshold_proportion = 0.2f;
 
+float edge_detect_proportion = 0.8f;
+
 uint8_t detection_mode = GREEN_DETECTOR;
+
+uint32_t sum_left = 0;
+uint32_t sum_mid = 0;
+uint32_t sum_right = 0; 
+
+// Edge Filter Settings
+float sigma1 = 3.0;
+float tlow1 = 0.5;
+float thigh1 = 0.95;
+
+// float sigma2 = 0.6;
+// float tlow2 = 0.5;
+// float thigh2 = 0.8;
+u_int16_t pixel_variance_threshold = 3;
+
+uint16_t free_space_threshold = 10;
 
 // define global variables
 struct ground_object_t {
@@ -103,8 +124,20 @@ struct green_object_t {
   bool updated;
 };
 
+struct edge_t {
+  // int32_t x_c;
+  // int32_t y_c;
+  uint16_t highest_column_idx;
+  uint16_t shorest_column_idx;
+  uint16_t highest_edge_height;
+  uint16_t shortest_edge_height;
+  int16_t strategy;
+  bool updated;
+};
+
 struct ground_object_t global_filters_ground[2];
 struct green_object_t global_filters_green[2];
+struct edge_t global_filters_edge[2];
 
 // Function
 // green detection
@@ -114,16 +147,22 @@ void find_object_counts(struct image_t *img, bool draw,
                               uint8_t cb_min, uint8_t cb_max,
                               uint8_t cr_min, uint8_t cr_max,
                               uint8_t bottom_height);
+
 // ground detection
 uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool draw,
                               uint8_t lum_min, uint8_t lum_max,
                               uint8_t cb_min, uint8_t cb_max,
                               uint8_t cr_min, uint8_t cr_max, uint16_t *yd, uint16_t *ud, uint16_t *vd, uint8_t *strategy);
 void histogram_bottom(struct image_t *img, uint16_t *yd, uint16_t *ud, uint16_t *vd);
-                              
-
 // the function to calculate the relationship parameter between two histogram
 uint32_t multiply(uint16_t *yd_bot, uint16_t *ud_bot, uint16_t *vd_bot, uint16_t *yd, uint16_t *ud, uint16_t *vd);
+
+// edge detection
+void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, float sigma, float tlow, float thigh);
+uint16_t median_filter(uint16_t *array, uint16_t length);
+// void compare (const void * a, const void * b);          
+int compare (const void * a, const void * b);               
+unsigned char * YUV2Gray(struct image_t *img);
 
 /*
  * this is the function for the object detector of the front camera
@@ -148,13 +187,14 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
         draw = cod_draw1;
         break;
       case 2:
-        lum_min = cod_lum_min2;
-        lum_max = cod_lum_max2;
-        cb_min = cod_cb_min2;
-        cb_max = cod_cb_max2;
-        cr_min = cod_cr_min2;
-        cr_max = cod_cr_max2;
-        draw = cod_draw2;
+        // lum_min = cod_lum_min2;
+        // lum_max = cod_lum_max2;
+        // cb_min = cod_cb_min2;
+        // cb_max = cod_cb_max2;
+        // cr_min = cod_cr_min2;
+        // cr_max = cod_cr_max2;
+        // draw = cod_draw2;
+        printf("ERROR, wrong front camera ID in airframe!");
         break;
       default:
         return img;
@@ -279,6 +319,40 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
 
 
   }
+  else if (detection_mode == EDGE_DETECTOR)
+  {
+    float sigma, tlow, thigh;
+    sigma = sigma1;
+    tlow = tlow1;
+    thigh = thigh1;
+    // Filter and find centroid
+    struct edge_t local_filter;
+    find_edge(&local_filter, img, draw, sigma, tlow, thigh);
+    if (local_filter.shortest_edge_height < free_space_threshold)
+    {
+      if (local_filter.shorest_column_idx < img->h * 0.5f) local_filter.strategy = ACTION_RIGHT;
+      else local_filter.strategy = ACTION_LEFT;
+    }
+    else 
+    {
+      if (local_filter.highest_column_idx < img->h * (0.5f - edge_detect_proportion/2.f + edge_detect_proportion/3.f)) {
+          local_filter.strategy = ACTION_LEFT;
+        } else if (local_filter.highest_column_idx > img->h * (0.5f + edge_detect_proportion/2.f - edge_detect_proportion/3.f)) {
+          local_filter.strategy = ACTION_RIGHT;
+        } else {
+          local_filter.strategy = ACTION_FORWARD;
+        }
+    }
+
+    pthread_mutex_lock(&mutex);
+    global_filters_edge[filter-1].highest_column_idx = local_filter.highest_column_idx;
+    global_filters_edge[filter-1].highest_edge_height = local_filter.highest_edge_height;
+    global_filters_edge[filter-1].shorest_column_idx = local_filter.shorest_column_idx;
+    global_filters_edge[filter-1].shortest_edge_height = local_filter.shortest_edge_height;
+    global_filters_edge[filter-1].strategy = local_filter.strategy;
+    global_filters_edge[filter-1].updated = true;
+    pthread_mutex_unlock(&mutex);
+  }
   return img;
 }
 
@@ -313,7 +387,7 @@ static struct image_t *object_detector_bottom(struct image_t *img, uint8_t filte
     
 
   }
-  else if (detection_mode == GREEN_DETECTOR)
+  else if (detection_mode == GREEN_DETECTOR || detection_mode == EDGE_DETECTOR)
   {
     // do nothing
   }
@@ -335,6 +409,8 @@ struct image_t *object_detector2(struct image_t *img, uint8_t camera_id __attrib
 void color_object_detector_init(void)
 {
   memset(global_filters_ground, 0, 2*sizeof(struct ground_object_t));
+  memset(global_filters_green, 0, 2*sizeof(struct green_object_t));
+  memset(global_filters_edge, 0, 2*sizeof(struct edge_t));
   pthread_mutex_init(&mutex, NULL);
 #ifdef COLOR_OBJECT_DETECTOR_CAMERA1
 #ifdef COLOR_OBJECT_DETECTOR_LUM_MIN1
@@ -352,8 +428,8 @@ void color_object_detector_init(void)
   cv_add_to_device(&COLOR_OBJECT_DETECTOR_CAMERA1, object_detector1, COLOR_OBJECT_DETECTOR_FPS1, 0);
 #endif
 
-#ifdef COLOR_OBJECT_DETECTOR_CAMERA2
-#ifdef COLOR_OBJECT_DETECTOR_LUM_MIN2
+#ifdef COLOR_OBJECT_DETECTOR_CAMERA2 // true
+#ifdef COLOR_OBJECT_DETECTOR_LUM_MIN2 // not true
   cod_lum_min2 = COLOR_OBJECT_DETECTOR_LUM_MIN2;
   cod_lum_max2 = COLOR_OBJECT_DETECTOR_LUM_MAX2;
   cod_cb_min2 = COLOR_OBJECT_DETECTOR_CB_MIN2;
@@ -376,6 +452,13 @@ green_bottom_height = GREEN_BOTTOM_HEIGHT;
 image_middle_proportion = IMAGE_MIDDLE_PROPORTION;
 middle_threshold_proportion = MIDDLE_THRESHOLD_PROPORTION;
 sideways_threshold_proportion = SIDEWAYS_THRESHOLD_PROPORTION;
+
+sigma1 = EDGE_DETECTOR_SIGMA1;
+tlow1 = EDGE_DETECTOR_TLOW1;
+thigh1 = EDGE_DETECTOR_THIGH1;
+pixel_variance_threshold = PIXEL_VAR_THRESHOLD;
+
+edge_detect_proportion = EDGE_DETECT_PROPORTION;
 
 detection_mode = DETECTION_MODE;
 #endif
@@ -540,12 +623,11 @@ uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool
   
   
   // compare the histogram with the histogram from the bottom
-  uint32_t sum_left = multiply(yd, ud, vd, histogram_yd_left, histogram_ud_left, histogram_vd_left);
-  uint32_t sum_mid = multiply(yd, ud, vd, histogram_yd_mid, histogram_ud_mid, histogram_vd_mid);
-  uint32_t sum_right = multiply(yd, ud, vd, histogram_yd_right, histogram_ud_right, histogram_vd_right); 
+  sum_left = multiply(yd, ud, vd, histogram_yd_left, histogram_ud_left, histogram_vd_left);
+  sum_mid = multiply(yd, ud, vd, histogram_yd_mid, histogram_ud_mid, histogram_vd_mid);
+  sum_right = multiply(yd, ud, vd, histogram_yd_right, histogram_ud_right, histogram_vd_right); 
 
   // choose the biggest relationship and set the strategy
-  printf("the current sum of the three part of the image is %d, %d, %d", sum_left,sum_mid,sum_right);
   // uint32_t biggest_direction = sum_mid;
   
   if (sum_mid < threshold_middle * 1000 || sum_left < threshold_sideways * 1000 || sum_right < threshold_sideways * 1000)  {
@@ -626,12 +708,242 @@ uint32_t multiply(uint16_t *yd_bot, uint16_t *ud_bot, uint16_t *vd_bot, uint16_t
 }
 
 
+unsigned char * YUV2Gray(struct image_t *img)
+{
+  uint8_t *buffer = img->buf;
+  unsigned char *gray = (unsigned char *)malloc(img->w * img->h * sizeof(unsigned char));
+
+  // Go through all the pixels
+  for (uint16_t y = 0; y < img->h; y++) {
+    for (uint16_t x = 0; x < img->w; x ++) {
+      // Check if the color is inside the specified values
+      uint8_t *yp, *up, *vp;
+      if (x % 2 == 0) {
+        // Even x
+        up = &buffer[y * 2 * img->w + 2 * x];      // U
+        yp = &buffer[y * 2 * img->w + 2 * x + 1];  // Y1
+        vp = &buffer[y * 2 * img->w + 2 * x + 2];  // V
+        //yp = &buffer[y * 2 * img->w + 2 * x + 3]; // Y2
+      } else {
+        // Uneven x
+        up = &buffer[y * 2 * img->w + 2 * x - 2];  // U
+        //yp = &buffer[y * 2 * img->w + 2 * x - 1]; // Y1
+        vp = &buffer[y * 2 * img->w + 2 * x];      // V
+        yp = &buffer[y * 2 * img->w + 2 * x + 1];  // Y2
+      }
+      gray[y * img->w + x] = *yp;
+    }
+  }
+  return gray;
+}
+
+
+uint16_t median_filter(uint16_t *array, uint16_t length)
+{
+  uint16_t *array_sorted = (uint16_t *)malloc(length * sizeof(uint16_t));
+  memcpy(array_sorted, array, length * sizeof(uint16_t));
+  qsort(array_sorted, length, sizeof(uint16_t), compare);
+  uint16_t median = array_sorted[length/2];
+  free(array_sorted);
+  return median;
+}
+
+int compare (const void * a, const void * b)
+{
+  return ( *(int*)a - *(int*)b );
+}
+
+
+void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, float sigma, float tlow, float thigh)
+{
+  uint8_t *buffer = img->buf;
+  uint32_t rows = img->h;
+  uint32_t cols = img->w;
+  unsigned char *edge;
+
+  // Convert to grayscale
+  unsigned char *gray = YUV2Gray(img);
+
+  // Canny edge detection
+  canny(gray, rows, cols, sigma, tlow, thigh, &edge, NULL);
+  // printf("%u", gray[20]);
+  free(gray);
+
+
+  // Go through all the pixels
+  for (uint16_t y = 0; y < rows; y++) {
+    for (uint16_t x = 0; x < cols; x ++) {
+      // Check if the color is inside the specified values
+      uint8_t *yp, *up, *vp;
+      if (x % 2 == 0) {
+        // Even x
+        up = &buffer[y * 2 * cols + 2 * x];      // U
+        yp = &buffer[y * 2 * cols + 2 * x + 1];  // Y1
+        vp = &buffer[y * 2 * cols + 2 * x + 2];  // V
+        //yp = &buffer[y * 2 * cols + 2 * x + 3]; // Y2
+      } else {
+        // Uneven x
+        up = &buffer[y * 2 * cols + 2 * x - 2];  // U
+        //yp = &buffer[y * 2 * cols + 2 * x - 1]; // Y1
+        vp = &buffer[y * 2 * cols + 2 * x];      // V
+        yp = &buffer[y * 2 * cols + 2 * x + 1];  // Y2
+      }
+      if ( edge[y * cols + x] < 100) {
+        if (draw){
+          *yp = 255;  // make pixel brighter in image
+        }
+      }
+    }
+  }
+
+  // find the lowest edge for each column
+  // note - the image is rotated 90 degrees
+  uint32_t edge_array_length = rows * cols;
+
+  uint32_t start_index = rows * (0.5f - edge_detect_proportion/2.f);
+  uint32_t end_index = rows * (0.5f + edge_detect_proportion/2.f);
+
+  uint16_t *first_edge_x_each_row = (uint16_t *)malloc(rows * sizeof(uint16_t));
+  uint16_t *first_edge_x_each_row_filtered = (uint16_t *)malloc(rows-2 * sizeof(uint16_t));
+  for (uint16_t i=0; i<rows; i++) {
+    first_edge_x_each_row[i] = cols+1; // set initial value to top of image
+  }
+  for (uint32_t i=0; i<edge_array_length; i++) {
+    // printf("%u", edge[i]);
+    uint32_t current_index = i; // edge_array_length - i - 1;
+    uint16_t current_x = current_index % cols;
+    uint16_t current_y = current_index / cols;
+    // printf("x: %u, ", current_x);
+    // printf("y: %u, ", current_y);
+    // printf("i: %u, ", current_index);
+    // printf("edge: %u; ", edge[current_index]);
+    if (current_y > start_index && current_y < end_index) // only use the middle part of the image
+    {
+      // if no values assigned to row, assign first edge
+      if ((first_edge_x_each_row[current_y]==cols+1) && !edge[current_index]) {
+        first_edge_x_each_row[current_y] = current_x;
+        // printf("x: %u, ", current_x);
+        // printf("y: %u, ", current_y);
+      }
+      // if no edge found after iterating through all columns, assin first column as edge
+
+    }
+    if (current_x == cols-1 && first_edge_x_each_row[current_y] == cols+1) {
+      first_edge_x_each_row[current_y] = 0;
+    }
+
+  }
+  
+  // find the column with highest free space from bottom
+  uint16_t row_with_largest_space = rows/2;
+  uint16_t row_with_shortest_space = rows/2;
+  int16_t longest_edge_length = -1; // max x is < 255 so okay, longest from botton to top - 240 pixels
+  // printf("cols: %d,", cols);
+  uint32_t shortest_edge_length = 1000;
+
+  // median filtering, find the largest space
+  for (uint32_t i=start_index + 2; i < end_index - 2; i++) {
+    // first_edge_x_each_row_filtered[i-1] = (first_edge_x_each_row[i-1] + first_edge_x_each_row[i] + first_edge_x_each_row[i+1])/3;
+    uint16_t edge_array[3] = {first_edge_x_each_row[i-1], first_edge_x_each_row[i], first_edge_x_each_row[i+1]};
+    first_edge_x_each_row_filtered[i-1] = median_filter(edge_array, 3);
+    // printf("median: %u, ", first_edge_x_each_row_filtered[i-1]);
+    // printf("%u: %u, ", i-1, first_edge_x_each_row_filtered[i-1]);
+    
+    // // if variance of edge lengths in edge array is too high, ignore this row, only used to guide the drone!
+    // if (abs(first_edge_x_each_row[i-1] - first_edge_x_each_row[i]) > pixel_variance_threshold || 
+    //     abs(first_edge_x_each_row[i] - first_edge_x_each_row[i+1]) > pixel_variance_threshold) {
+    //   continue;
+    // }
+  
+
+    if (first_edge_x_each_row_filtered[i-1] > longest_edge_length) {
+      longest_edge_length = first_edge_x_each_row_filtered[i-1];
+      row_with_largest_space = i;
+    }
+
+    if (first_edge_x_each_row_filtered[i-1] < shortest_edge_length) {
+      shortest_edge_length = first_edge_x_each_row_filtered[i-1];
+      row_with_shortest_space = i;
+    }
+  } 
+  
+  if (longest_edge_length == -1) {longest_edge_length = cols;}
+  if (shortest_edge_length == 1000) {shortest_edge_length = 0;} // no edge, force the drone to turn
+
+  // color the 3 rows with largest space, neon green
+  for (uint16_t i=0; i<cols; i++) {
+    for (uint16_t j=row_with_largest_space-1; j<row_with_largest_space+2; j++) {
+      uint8_t *yp, *up, *vp;
+      if (i % 2 == 0) {
+        // Even x
+        up = &buffer[j * 2 * cols + 2 * i];      // U
+        yp = &buffer[j * 2 * cols + 2 * i + 1];  // Y1
+        vp = &buffer[j * 2 * cols + 2 * i + 2];  // V
+        //yp = &buffer[j * 2 * cols + 2 * i + 3]; // Y2
+      } else {
+        // Uneven x
+        up = &buffer[j * 2 * cols + 2 * i - 2];  // U
+        //yp = &buffer[j * 2 * cols + 2 * i - 1]; // Y1
+        vp = &buffer[j * 2 * cols + 2 * i];      // V
+        yp = &buffer[j * 2 * cols + 2 * i + 1];  // Y2
+      }
+      *yp = 184;  // make pixel brighter in image
+      *up = 128;  // make pixel brighter in image
+      *vp = 255;  // make pixel brighter in image
+    }
+  }
+
+  // color the 3 rows with shortest space, neon green
+  for (uint16_t i=0; i<cols; i++) {
+    for (uint16_t j=row_with_shortest_space-1; j<row_with_shortest_space+2; j++) {
+      uint8_t *yp, *up, *vp;
+      if (i % 2 == 0) {
+        // Even x
+        up = &buffer[j * 2 * cols + 2 * i];      // U
+        yp = &buffer[j * 2 * cols + 2 * i + 1];  // Y1
+        vp = &buffer[j * 2 * cols + 2 * i + 2];  // V
+        //yp = &buffer[j * 2 * cols + 2 * i + 3]; // Y2
+      } else {
+        // Uneven x
+        up = &buffer[j * 2 * cols + 2 * i - 2];  // U
+        //yp = &buffer[j * 2 * cols + 2 * i - 1]; // Y1
+        vp = &buffer[j * 2 * cols + 2 * i];      // V
+        yp = &buffer[j * 2 * cols + 2 * i + 1];  // Y2
+      }
+      *yp = 184;  // make pixel brighter in image
+      *up = 255;  // make pixel brighter in image
+      *vp = 128;  // make pixel brighter in image
+    }
+  }
+
+
+  // TODO: sliding window
+  // buffer[least_first_edge_y * 2 * cols + 2 * highest_column_x - 2] = -37.52415; // U
+  // buffer[least_first_edge_y * 2 * cols + 2 * highest_column_x] = 157.27575;     // V
+  // buffer[least_first_edge_y * 2 * cols + 2 * highest_column_x + 1] = 76.245;    // Y
+
+  // printf("free direction: %u, ", row_with_largest_space);
+  // printf("free space: %u, ", longest_edge_length);
+  // printf("in 0 - %u\n", rows);
+  free(first_edge_x_each_row);
+  free(first_edge_x_each_row_filtered);
+  local_filter_ptr->highest_edge_height = longest_edge_length;
+  local_filter_ptr->shortest_edge_height = shortest_edge_length;
+  local_filter_ptr->shorest_column_idx = row_with_shortest_space;
+  local_filter_ptr->highest_column_idx = row_with_largest_space;
+  return;
+}
+
+
 void color_object_detector_periodic(void)
 {
   if (detection_mode == GROUND_DETECTOR)
   {
     global_filters_green[0].updated = false;
     global_filters_green[1].updated = false;
+
+    global_filters_edge[0].updated = false;
+    global_filters_edge[1].updated = false;
 
     static struct ground_object_t local_filters[2];
     pthread_mutex_lock(&mutex);
@@ -640,9 +952,15 @@ void color_object_detector_periodic(void)
     pthread_mutex_unlock(&mutex);
 
     if(local_filters[0].updated){
-      AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION1_ID, local_filters[0].x_c, local_filters[0].y_c,
-          0, 0, local_filters[0].color_count, local_filters[0].strategy);
+      AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION1_ID, 
+        local_filters[0].x_c, 
+        local_filters[0].y_c,
+        0, 
+        0, 
+        local_filters[0].color_count, 
+        local_filters[0].strategy);
       local_filters[0].updated = false;
+      printf("Ground, L = %d, M = %d, R = %d\n", sum_left, sum_mid, sum_right);
     }
     // if(local_filters[1].updated){
     //   AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION2_ID, local_filters[1].x_c, local_filters[1].y_c,
@@ -654,6 +972,9 @@ void color_object_detector_periodic(void)
   {
     global_filters_ground[0].updated = false;
     global_filters_ground[1].updated = false;
+
+    global_filters_edge[0].updated = false;
+    global_filters_edge[1].updated = false;
 
     static struct green_object_t local_filters[2];
     pthread_mutex_lock(&mutex);
@@ -669,6 +990,9 @@ void color_object_detector_periodic(void)
         (int32_t)local_filters[0].threshold_middle,
         (int16_t)local_filters[0].strategy);
       local_filters[0].updated = false;
+
+      printf("Green, L = %d, R = %d, thS = %d, M = %d, thM = %d\n", local_filters[0].count_left, local_filters[0].count_right, \
+        local_filters[0].threshold_sideways, local_filters[0].count_middle, local_filters[0].threshold_middle);
     }
     // if(local_filters[1].updated){
     //   AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION2_ID, 
@@ -680,6 +1004,36 @@ void color_object_detector_periodic(void)
     //     (int16_t)local_filters[1].strategy);
     //   local_filters[1].updated = false;
     // }
+  }
+  else if (detection_mode == EDGE_DETECTOR)
+  {
+    global_filters_green[0].updated = false;
+    global_filters_green[1].updated = false;
+
+    global_filters_ground[0].updated = false;
+    global_filters_ground[1].updated = false;
+
+    static struct edge_t local_filters[2];
+    pthread_mutex_lock(&mutex);
+    memcpy(local_filters, global_filters_edge, 2*sizeof(struct edge_t));
+    pthread_mutex_unlock(&mutex);
+
+    if(local_filters[0].updated){
+      AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION1_ID, 
+        0, 
+        0,
+        0, 
+        (int16_t)local_filters[0].highest_edge_height, 
+        (int32_t)local_filters[0].highest_column_idx,
+        local_filters[0].strategy); // third last element is the the free space height, int32_t, range (0,240)
+      local_filters[0].updated = false;
+
+      printf("Edge, high = %d, hi = %d, low = %d, li = %d\n", 
+            local_filters[0].highest_edge_height, 
+            local_filters[0].highest_column_idx, 
+            local_filters[0].shortest_edge_height,
+            local_filters[0].shorest_column_idx);
+    }
   }
 }
 

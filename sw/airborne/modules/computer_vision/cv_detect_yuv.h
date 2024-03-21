@@ -75,6 +75,10 @@ extern uint8_t cod_cr_max2;
 extern bool cod_draw1;
 extern bool cod_draw2;
 
+extern float sigma1;
+extern float tlow1;
+extern float thigh1;
+extern uint16_t pixel_variance_threshold;
 
 extern uint32_t threshold_middle;
 extern uint32_t threshold_sideways;
@@ -84,6 +88,8 @@ extern float middle_threshold_proportion;
 extern float sideways_threshold_proportion;
 extern uint8_t green_bottom_height;
 extern uint8_t detection_mode;
+
+extern float edge_detect_proportion;
 
 // Module functions
 extern void color_object_detector_init(void);
