@@ -296,7 +296,7 @@ void green_tracker_periodic(void)
         }  
         else 
         {
-          moveWaypointForward(WP_GOAL, moveDistance);
+          moveWaypointForward(WP_GOAL, 5.f * moveDistance);
         }
       }  
 
