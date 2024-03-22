@@ -274,6 +274,9 @@ void green_tracker_periodic(void)
       } 
       else if ((green_detect_result == ACTION_FORWARD_LEFT || green_detect_result == ACTION_FORWARD_RIGHT) && slight_turn){
       	green_tracker_direction = green_detect_result;
+        //if(use_vel_control){
+
+        //}
       	chooseSelectedIncrementAvoidance( green_tracker_direction);
         increase_nav_heading(10.f * heading_increment);
         moveWaypointForward(WP_GOAL, 0.5f * moveDistance);

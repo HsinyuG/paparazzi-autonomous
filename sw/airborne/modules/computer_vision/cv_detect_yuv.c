@@ -800,8 +800,11 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
   // note - the image is rotated 90 degrees
   uint32_t edge_array_length = rows * cols;
 
-  uint32_t start_index = rows * (0.5f - edge_detect_proportion/2.f);
-  uint32_t end_index = rows * (0.5f + edge_detect_proportion/2.f);
+  // uint32_t start_index = rows * (0.5f - edge_detect_proportion/2.f);
+  // uint32_t end_index = rows * (0.5f + edge_detect_proportion/2.f);
+
+  uint32_t start_index = 51;
+  uint32_t end_index = 350;
 
   uint16_t *first_edge_x_each_row = (uint16_t *)malloc(rows * sizeof(uint16_t));
   uint16_t *first_edge_x_each_row_filtered = (uint16_t *)malloc(rows-2 * sizeof(uint16_t));
@@ -861,7 +864,7 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
       row_with_largest_space = i;
     }
 
-    if (first_edge_x_each_row_filtered[i-1] < shortest_edge_length) {
+    if (first_edge_x_each_row_filtered[i-1] < shortest_edge_length && first_edge_x_each_row_filtered[i-1] != 0) {
       shortest_edge_length = first_edge_x_each_row_filtered[i-1];
       row_with_shortest_space = i;
     }
