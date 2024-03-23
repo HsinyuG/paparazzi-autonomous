@@ -280,8 +280,8 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
     pthread_mutex_lock(&mutex);
     //global_filters_green[filter-1].color_count = count;
 
-    uint32_t middle_threshold_pixel = middle_threshold_proportion * img->h * (image_middle_proportion) * green_bottom_height;
-    uint32_t sideways_threshold_pixel = sideways_threshold_proportion * img->h * (1.f-image_middle_proportion)/2.f * green_bottom_height;
+    uint32_t middle_threshold_pixel = middle_threshold_proportion * 160 * green_bottom_height;
+    uint32_t sideways_threshold_pixel = sideways_threshold_proportion * 80 * green_bottom_height;
     if (count_middle < middle_threshold_pixel || count_left < sideways_threshold_pixel || count_right < sideways_threshold_pixel)
     {
       if (count_left > count_right)
@@ -295,11 +295,11 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
     }
     else
     {
-      if (count_left > count_right && count_left > count_middle)
+      if (count_left > count_right && count_left*2 > count_middle)
       {
         global_filters_green[filter-1].strategy = ACTION_FORWARD_LEFT;
       }
-      else if (count_right > count_left && count_right > count_middle)
+      else if (count_right > count_left && count_right*2 > count_middle)
       {
         global_filters_green[filter-1].strategy = ACTION_FORWARD_RIGHT;
       }
@@ -509,13 +509,13 @@ void find_object_counts(struct image_t *img, bool draw,
         // printf("bound2 = %f\n", 1-1/num_parts);
         // printf("bound3 = %f\n", img->w * (1-1/num_parts));
         // if (!(loop_count % 100)) printf("bound1 = %d\n", img->w); //{printf("current x: %u, ", x);}
-        if (y < img->h * (0.5 - image_middle_proportion/2.0f)) {
+        if (y < 180&& y > 100 ) {
           *count_left += 1;
           // if (!(loop_count % 100)) {printf("1\n");}
-        } else if (y > img->h * (0.5 + image_middle_proportion/2.0f)) {
+        } else if (y > 340 && y < 420 ) {
           *count_right += 1;
           // if (!(loop_count % 100)) {printf("2\n");}
-        } else {
+        } else if (y > 180 && y < 340) {
           *count_middle += 1;
           // if (!(loop_count % 100)) {printf("3\n");}
         }
