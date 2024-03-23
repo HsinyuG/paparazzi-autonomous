@@ -339,7 +339,7 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
   uint32_t shortest_edge_length = 1000;
 
   // median filtering, find the largest space
-  for (uint32_t i=start_index + 2; i < end_index - 2; i++) {
+  for (uint32_t i=start_index + 2; i < 350; i++) {
     // first_edge_x_each_row_filtered[i-1] = (first_edge_x_each_row[i-1] + first_edge_x_each_row[i] + first_edge_x_each_row[i+1])/3;
     uint16_t edge_array[3] = {first_edge_x_each_row[i-1], first_edge_x_each_row[i], first_edge_x_each_row[i+1]};
     first_edge_x_each_row_filtered[i-1] = median_filter(edge_array, 3);
@@ -358,7 +358,7 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
       row_with_largest_space = i;
     }
 
-    if (first_edge_x_each_row_filtered[i-1] < shortest_edge_length) {
+    if (first_edge_x_each_row_filtered[i-1] < shortest_edge_length && first_edge_x_each_row_filtered[i-1]!=0) {
       shortest_edge_length = first_edge_x_each_row_filtered[i-1];
       row_with_shortest_space = i;
     }
