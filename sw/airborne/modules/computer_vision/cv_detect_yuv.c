@@ -102,6 +102,8 @@ u_int16_t pixel_variance_threshold = 3;
 
 uint16_t free_space_threshold = 10;
 
+bool small_window = true; // true: the drone is using a small central window
+
 // define global variables
 struct ground_object_t {
   int32_t x_c;
@@ -279,34 +281,70 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
 
     pthread_mutex_lock(&mutex);
     //global_filters_green[filter-1].color_count = count;
+    
+    uint32_t middle_threshold_pixel;
+    uint32_t sideways_threshold_pixel;
+    
+    if (small_window == true){ 
 
-    uint32_t middle_threshold_pixel = middle_threshold_proportion * 160 * green_bottom_height;
-    uint32_t sideways_threshold_pixel = sideways_threshold_proportion * 80 * green_bottom_height;
-    if (count_middle < middle_threshold_pixel || count_left < sideways_threshold_pixel || count_right < sideways_threshold_pixel)
-    {
-      if (count_left > count_right)
-      {
-        global_filters_green[filter-1].strategy = ACTION_LEFT;
-      }
-      else
-      {
-        global_filters_green[filter-1].strategy = ACTION_RIGHT;
-      }
+	    middle_threshold_pixel = middle_threshold_proportion * 160 * green_bottom_height;
+	    sideways_threshold_pixel = sideways_threshold_proportion * 80 * green_bottom_height;
+	    if (count_middle < middle_threshold_pixel || count_left < sideways_threshold_pixel || count_right < sideways_threshold_pixel)
+	    {
+	      if (count_left > count_right)
+	      {
+		global_filters_green[filter-1].strategy = ACTION_LEFT;
+	      }
+	      else
+	      {
+		global_filters_green[filter-1].strategy = ACTION_RIGHT;
+	      }
+	    }
+	    else
+	    {
+	      if (count_left > count_right && count_left*2 > count_middle)
+	      {
+		global_filters_green[filter-1].strategy = ACTION_FORWARD_LEFT;
+	      }
+	      else if (count_right > count_left && count_right*2 > count_middle)
+	      {
+		global_filters_green[filter-1].strategy = ACTION_FORWARD_RIGHT;
+	      }
+	      else
+	      {
+		global_filters_green[filter-1].strategy = ACTION_FORWARD;
+	      }
+	    }
     }
-    else
-    {
-      if (count_left > count_right && count_left*2 > count_middle)
-      {
-        global_filters_green[filter-1].strategy = ACTION_FORWARD_LEFT;
-      }
-      else if (count_right > count_left && count_right*2 > count_middle)
-      {
-        global_filters_green[filter-1].strategy = ACTION_FORWARD_RIGHT;
-      }
-      else
-      {
-        global_filters_green[filter-1].strategy = ACTION_FORWARD;
-      }
+    else {
+        middle_threshold_pixel = middle_threshold_proportion * img->h * (image_middle_proportion) * green_bottom_height;
+    	sideways_threshold_pixel = sideways_threshold_proportion * img->h * (1.f-image_middle_proportion)/2.f * green_bottom_height;
+    	if (count_middle < middle_threshold_pixel || count_left < sideways_threshold_pixel || count_right < sideways_threshold_pixel)
+    	{
+	      if (count_left > count_right)
+	      {
+		global_filters_green[filter-1].strategy = ACTION_LEFT;
+	      }
+	      else
+	      {
+		global_filters_green[filter-1].strategy = ACTION_RIGHT;
+	      }
+	    }
+	    else
+	    {
+	      if (count_left > count_right && count_left > count_middle)
+	      {
+		global_filters_green[filter-1].strategy = ACTION_FORWARD_LEFT;
+	      }
+	      else if (count_right > count_left && count_right > count_middle)
+	      {
+		global_filters_green[filter-1].strategy = ACTION_FORWARD_RIGHT;
+	      }
+	      else
+	      {
+		global_filters_green[filter-1].strategy = ACTION_FORWARD;
+	      }
+    	}
     }
 
     global_filters_green[filter-1].threshold_middle = middle_threshold_pixel;
@@ -448,6 +486,7 @@ void color_object_detector_init(void)
 threshold_middle = THRESHOLD_MIDDLE;
 threshold_sideways = THRESHOLD_SIDEWAYS;
 green_bottom_height = GREEN_BOTTOM_HEIGHT;
+small_window = SMALL_WINDOW;
 
 image_middle_proportion = IMAGE_MIDDLE_PROPORTION;
 middle_threshold_proportion = MIDDLE_THRESHOLD_PROPORTION;
@@ -509,16 +548,30 @@ void find_object_counts(struct image_t *img, bool draw,
         // printf("bound2 = %f\n", 1-1/num_parts);
         // printf("bound3 = %f\n", img->w * (1-1/num_parts));
         // if (!(loop_count % 100)) printf("bound1 = %d\n", img->w); //{printf("current x: %u, ", x);}
+        if (small_window == true){
         if (y < 180&& y > 100 ) {
-          *count_left += 1;
-          // if (!(loop_count % 100)) {printf("1\n");}
-        } else if (y > 340 && y < 420 ) {
-          *count_right += 1;
-          // if (!(loop_count % 100)) {printf("2\n");}
-        } else if (y > 180 && y < 340) {
-          *count_middle += 1;
-          // if (!(loop_count % 100)) {printf("3\n");}
+		  *count_left += 1;
+		  // if (!(loop_count % 100)) {printf("1\n");}
+		} else if (y > 340 && y < 420 ) {
+		  *count_right += 1;
+		  // if (!(loop_count % 100)) {printf("2\n");}
+		} else if (y > 180 && y < 340) {
+		  *count_middle += 1;
+		  // if (!(loop_count % 100)) {printf("3\n");}
+		}
         }
+        else {
+		if (y < img->h * (0.5 - image_middle_proportion/2.0f)) {
+		  *count_left += 1;
+		  // if (!(loop_count % 100)) {printf("1\n");}
+		} else if (y > img->h * (0.5 + image_middle_proportion/2.0f)) {
+		  *count_right += 1;
+		  // if (!(loop_count % 100)) {printf("2\n");}
+		} else {
+		  *count_middle += 1;
+		  // if (!(loop_count % 100)) {printf("3\n");}
+        }
+	}
 
         if (draw){
           *yp = 255;  // make pixel brighter in image

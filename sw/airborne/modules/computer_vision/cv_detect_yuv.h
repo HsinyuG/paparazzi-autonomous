@@ -74,6 +74,7 @@ extern uint8_t cod_cr_max2;
 
 extern bool cod_draw1;
 extern bool cod_draw2;
+extern bool small_window;
 
 extern float sigma1;
 extern float tlow1;
