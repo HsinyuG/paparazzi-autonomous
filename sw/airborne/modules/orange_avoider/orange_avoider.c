@@ -94,6 +94,11 @@ float last_y = 0.0f;
 
 float ang_vel = 3.14f;
 
+uint16_t min_accel_cnt = 20;
+uint16_t accel_cnt = 0;
+
+float hysteresis_coeff = 1.2f;
+
 /*
  * This next section defines an ABI messaging event (http://wiki.paparazziuav.org/wiki/ABI), necessary
  * any time data calculated in another module needs to be accessed. Including the file where this external
@@ -156,8 +161,8 @@ void green_tracker_init(void)
   chooseRandomIncrementAvoidance();
 
   // bind our colorfilter callbacks to receive the color filter outputs
-  // AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, green_detection_cb);
-  AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, general_detection_cb);
+  AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, green_detection_cb);
+  // AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, general_detection_cb);
 
   #ifdef FORWARD_VEL
   maxDistance = MAX_DISTANCE;
@@ -171,6 +176,8 @@ void green_tracker_init(void)
   compare_middle_left_right = COMPARE_MIDDLE_LEFT_RIGHT;
   enable_bounds_detect = ENABLE_BOUNDS_DETECT;
   slight_turn = SLIGHT_TURN;
+  hysteresis_coeff = HYSTERESIS_COEFF;
+  min_accel_cnt = MIN_ACCEL_CNT;
   #endif
 }
 //END of CHANGJUN ADDED PART 
@@ -266,20 +273,24 @@ void green_tracker_periodic(void)
   float moveDistance = maxDistance;
   switch (navigation_state){
     case SAFE:
+      accel_cnt ++;
       if ( ((green_detect_result != ACTION_FORWARD) && compare_middle_left_right) ||\
         ((green_detect_result == ACTION_LEFT || green_detect_result == ACTION_RIGHT) && !compare_middle_left_right))
       { // it should be able to detect the boundary as well
         green_tracker_direction = green_detect_result;
         navigation_state = OBSTACLE_FOUND;
       } 
-      else if ((green_detect_result == ACTION_FORWARD_LEFT || green_detect_result == ACTION_FORWARD_RIGHT) && slight_turn){
-      
+      else if ((green_detect_result == ACTION_FORWARD_LEFT ||\
+                green_detect_result == ACTION_FORWARD_RIGHT) &&\
+                slight_turn &&\
+                accel_cnt > min_accel_cnt)
+      {
         green_tracker_direction = green_detect_result;
         if (use_vel_control) {
            guidance_h_set_body_vel(forward_vel, 0); 
            chooseSelectedIncrementAvoidance(green_tracker_direction);
-           guidance_h_set_heading_rate(heading_increment * ang_vel);
-           printf("this drone is making slight turning");
+           guidance_h_set_heading_rate(heading_increment * ang_vel * 1.f);
+           printf("this drone is making slight turning ----- ");
         }
         else {      
       	  chooseSelectedIncrementAvoidance( green_tracker_direction);
@@ -302,6 +313,9 @@ void green_tracker_periodic(void)
         { // only necessary if outside someone holding a green cloth
           chooseRandomIncrementAvoidance();
           // green_tracker_direction = green_detect_result;
+          // stop
+          moveWaypointForward(WP_GOAL, - proportion_move_back * moveDistance);
+          moveWaypointForward(WP_TRAJECTORY, - proportion_move_back * moveDistance);
           navigation_state = OUT_OF_BOUNDS;
         }  
         else 
@@ -352,6 +366,7 @@ void green_tracker_periodic(void)
 
       break;
     case SEARCH_FOR_SAFE_HEADING: // continue on certain direction to turn, to prevent conflict direction in OBSTACLE_FOUND after OUT_OF_BOUNDS
+      accel_cnt = 0;
       if (use_vel_control) {
         guidance_h_set_body_vel(0, 0);
         guidance_h_set_heading_rate(heading_increment * ang_vel);
@@ -363,38 +378,44 @@ void green_tracker_periodic(void)
       // if (obstacle_free_confidence >= 2){
       //   navigation_state = SAFE;
       if (!slight_turn){
-      	if ( ((green_detect_result == ACTION_FORWARD) && compare_middle_left_right) ||\
-        ((green_detect_result != ACTION_LEFT && green_detect_result != ACTION_RIGHT) && !compare_middle_left_right))
+      	if ( ((count_middle > hysteresis_coeff * threshold_middle) &&\
+              (count_left > hysteresis_coeff * threshold_sideways) &&\
+              (count_right > hysteresis_coeff * threshold_sideways) &&\
+              (count_middle > hysteresis_coeff * count_left) &&\
+              (count_middle > hysteresis_coeff * count_right) &&\
+              compare_middle_left_right) ||\
+             ((count_middle > hysteresis_coeff * threshold_middle) &&\
+              (count_left > hysteresis_coeff * threshold_sideways) &&\
+              (count_right > hysteresis_coeff * threshold_sideways) &&\
+              !compare_middle_left_right))
       	{
         	navigation_state = SAFE;
       	}
-      	break;
       }
       else{
-        if(green_detect_result == ACTION_FORWARD){
+        if((count_middle > hysteresis_coeff * threshold_middle) &&\
+           (count_left > hysteresis_coeff * threshold_sideways) &&\
+           (count_right > hysteresis_coeff * threshold_sideways) &&\
+           green_detect_result == ACTION_FORWARD)
+        {
           navigation_state = SAFE;
         }
-        break;
       }
       break;
     case OUT_OF_BOUNDS: // use the detect result to determine the changing direction, to avoid conflic direction with obstacle avoid? No, will cause deadlock --> obstacle avoid also random direction
-      // stop
-      waypoint_move_here_2d(WP_GOAL);
-      waypoint_move_here_2d(WP_TRAJECTORY);
-
-      increase_nav_heading(heading_increment);
+      increase_nav_heading(10.f * heading_increment);
       // moveWaypointForward(WP_TRAJECTORY, 1.5f); // has bug: max distance + 0.75 out of boundary, but this one still in, so immediately jump out
       moveWaypointForward(WP_TRAJECTORY, 0.75f + moveDistance);
 
       if (InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         // add offset to head back into arena
-        increase_nav_heading(heading_increment);
+        increase_nav_heading(10.f * heading_increment);
 
         // reset safe counter
         // obstacle_free_confidence = 0;
 
         // ensure direction is safe before continuing
-        navigation_state = MOVE_BACK;
+        navigation_state = SEARCH_FOR_SAFE_HEADING;
       }
       break;
     case MOVE_BACK: // not considering move back and out of bounds, because we come from that direction

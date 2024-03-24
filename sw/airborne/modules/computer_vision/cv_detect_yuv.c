@@ -103,6 +103,7 @@ u_int16_t pixel_variance_threshold = 3;
 uint16_t free_space_threshold = 10;
 
 bool small_window = true; // true: the drone is using a small central window
+float compare_threshold = 1.1f;
 
 // define global variables
 struct ground_object_t {
@@ -302,11 +303,11 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
 	    }
 	    else
 	    {
-	      if (count_left > count_right && count_left*2 > count_middle)
+	      if (count_left > compare_threshold * count_right && count_left * 2 > compare_threshold * count_middle)
 	      {
 		global_filters_green[filter-1].strategy = ACTION_FORWARD_LEFT;
 	      }
-	      else if (count_right > count_left && count_right*2 > count_middle)
+	      else if (count_right > compare_threshold * count_left && count_right * 2 > compare_threshold * count_middle)
 	      {
 		global_filters_green[filter-1].strategy = ACTION_FORWARD_RIGHT;
 	      }
@@ -332,11 +333,11 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
 	    }
 	    else
 	    {
-	      if (count_left > count_right && count_left > count_middle)
+	      if (count_left > compare_threshold * count_right && count_left > compare_threshold * count_middle)
 	      {
 		global_filters_green[filter-1].strategy = ACTION_FORWARD_LEFT;
 	      }
-	      else if (count_right > count_left && count_right > count_middle)
+	      else if (count_right > compare_threshold * count_left && count_right > compare_threshold * count_middle)
 	      {
 		global_filters_green[filter-1].strategy = ACTION_FORWARD_RIGHT;
 	      }
@@ -500,6 +501,8 @@ pixel_variance_threshold = PIXEL_VAR_THRESHOLD;
 edge_detect_proportion = EDGE_DETECT_PROPORTION;
 
 detection_mode = DETECTION_MODE;
+
+compare_threshold = COMPARE_THRESHOLD;
 #endif
 }
 

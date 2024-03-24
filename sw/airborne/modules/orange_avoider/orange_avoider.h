@@ -29,6 +29,8 @@ extern float ang_vel;
 extern bool use_vel_control;
 extern float forward_vel;
 extern float backward_vel;
+extern uint16_t min_accel_cnt;
+extern float hysteresis_coeff;
 
 // functions
 extern void orange_avoider_init(void);

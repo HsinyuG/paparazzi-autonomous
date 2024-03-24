@@ -64,6 +64,9 @@
       <!-- 0.30 increase -->
       <define name="SIDEWAYS_THRESHOLD_PROPORTION" value="0.10"/> 
       <!-- 0.11 -->
+      <define name="MIN_ACCEL_CNT" value="20"/> 
+      <define name="HYSTERESIS_COEFF" value="1.2"/> 
+      <define name="COMPARE_THRESHOLD" value="1.1"/> 
       <!-- edge detector -->
       <define name="EDGE_DETECTOR_SIGMA1" value="0.6"/>
       <define name="EDGE_DETECTOR_TLOW1" value="0.5"/>
@@ -119,8 +122,14 @@
       <!-- green detector -->
       <define name="GREEN_BOTTOM_HEIGHT" value="80"/>
       <define name="IMAGE_MIDDLE_PROPORTION" value="0.33"/>
-      <define name="MIDDLE_THRESHOLD_PROPORTION" value="0.5"/>
-      <define name="SIDEWAYS_THRESHOLD_PROPORTION" value="0.2"/>
+      <define name="MIDDLE_THRESHOLD_PROPORTION" value="0.2"/>
+      <!-- 0.5 -->
+      <define name="SIDEWAYS_THRESHOLD_PROPORTION" value="0.1"/>
+      <!-- 0.2 -->
+
+      <define name="MIN_ACCEL_CNT" value="20"/> 
+      <define name="HYSTERESIS_COEFF" value="1.2"/> 
+      <define name="COMPARE_THRESHOLD" value="1.1"/> 
       <!-- edge detector -->
       <define name="EDGE_DETECTOR_SIGMA1" value="3.0"/>
       <define name="EDGE_DETECTOR_TLOW1" value="0.5"/>

@@ -43,6 +43,7 @@
          <dl_setting var="sideways_threshold_proportion" min="0" step="0.01" max="1" shortname="side_th"/>
          <dl_setting var="image_middle_proportion" min="0" step="0.01" max="1"/>
          <dl_setting var="green_bottom_height" min="0" step="1" max="240"/>
+         <dl_setting var="compare_threshold" min="1" step="0.05" max="1.5"/>
 
          <!-- edge detection -->
          <dl_setting var="edge_detect_proportion" min="0" step="0.05" max="1" shortname="edge_fov"/>
