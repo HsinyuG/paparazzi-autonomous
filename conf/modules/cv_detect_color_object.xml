@@ -35,16 +35,36 @@
           <strip_button name="GROUND_DETECTOR" value="1"/>
           <strip_button name="EDGE_DETECTOR" value="2"/>
         </dl_setting>
+
+         <!-- green detection -->          <!-- tree detection -->
+         <dl_setting var="middle_threshold_proportion" min="0" step="0.01" max="1" shortname="middle_th"/>
+         <dl_setting var="sideways_threshold_proportion" min="0" step="0.01" max="1" shortname="side_th"/>
+         <dl_setting var="detect_tree"  min="0" step="1" max="1" values="False|True" />
+         <dl_setting var="tree_threshold_proportion" min="0" step="0.01" max="1" shortname="tree_th"/>
+         <dl_setting var="image_middle_proportion" min="0" step="0.01" max="1"/>
+         <dl_setting var="green_bottom_height" min="1" step="1" max="239"/>
+         <dl_setting var="tree_top_height" min="1" step="1" max="239"/>
+         <dl_setting var="compare_threshold" min="1" step="0.05" max="1.5" shortname="smallr_hyst"/>
+         <dl_setting var="small_window"  min="0" step="1" max="1" values="False|True" />
+         <dl_setting var="cod_draw1"  min="0" step="1" max="1" values="False|True" shortname="draw 1" />
+         <dl_setting var="cod_lum_min1" min="0" step="1" max="255" shortname="y_min1"/>
+         <dl_setting var="cod_lum_max1" min="0" step="1" max="255" shortname="y_max1"/>
+         <dl_setting var="cod_cb_min1"   min="0" step="1" max="255" shortname="u_min1"/>
+         <dl_setting var="cod_cb_max1"   min="0" step="1" max="255" shortname="u_max1"/>
+         <dl_setting var="cod_cr_min1"   min="0" step="1" max="255" shortname="v_min1"/>
+         <dl_setting var="cod_cr_max1"   min="0" step="1" max="255" shortname="v_max1"/>
+         <dl_setting var="tree_y_min" min="0" step="1" max="255"/>
+         <dl_setting var="tree_y_max" min="0" step="1" max="255"/>
+         <dl_setting var="tree_u_min"   min="0" step="1" max="255"/>
+         <dl_setting var="tree_u_max"   min="0" step="1" max="255"/>
+         <dl_setting var="tree_v_min"   min="0" step="1" max="255"/>
+         <dl_setting var="tree_v_max"   min="0" step="1" max="255"/>
+
+         
+
          <!-- ground detection -->
          <dl_setting var="threshold_middle" min="0" step="100" max="10000"/>
          <dl_setting var="threshold_sideways" min="0" step="100" max="10000"/>
-         <!-- green detection -->
-         <dl_setting var="middle_threshold_proportion" min="0" step="0.01" max="1" shortname="middle_th"/>
-         <dl_setting var="sideways_threshold_proportion" min="0" step="0.01" max="1" shortname="side_th"/>
-         <dl_setting var="image_middle_proportion" min="0" step="0.01" max="1"/>
-         <dl_setting var="green_bottom_height" min="0" step="1" max="240"/>
-         <dl_setting var="compare_threshold" min="1" step="0.05" max="1.5"/>
-
          <!-- edge detection -->
          <dl_setting var="edge_detect_proportion" min="0" step="0.05" max="1" shortname="edge_fov"/>
          <dl_setting var="pixel_variance_threshold" min="0" step="1" max="10" shortname="pixvar"/>
@@ -52,14 +72,7 @@
          <dl_setting var="tlow1" min="0" step="0.01" max="1" shortname="tlow1"/>
          <dl_setting var="thigh1"   min="0" step="0.01" max="1" shortname="thigh1"/>
 
-         <dl_setting var="small_window"  min="0" step="1" max="1" values="False|True" shortname="sm_window" />
-         <dl_setting var="cod_lum_min1" min="0" step="1" max="255" shortname="y_min1"/>
-         <dl_setting var="cod_lum_max1" min="0" step="1" max="255" shortname="y_max1"/>
-         <dl_setting var="cod_cb_min1"   min="0" step="1" max="255" shortname="u_min1"/>
-         <dl_setting var="cod_cb_max1"   min="0" step="1" max="255" shortname="u_max1"/>
-         <dl_setting var="cod_cr_min1"   min="0" step="1" max="255" shortname="v_min1"/>
-         <dl_setting var="cod_cr_max1"   min="0" step="1" max="255" shortname="v_max1"/>
-         <dl_setting var="cod_draw1"  min="0" step="1" max="1" values="False|True" shortname="draw 1" />
+
          <dl_setting var="cod_lum_min2" min="0" step="1" max="255" shortname="y_min2"/>
          <dl_setting var="cod_lum_max2" min="0" step="1" max="255" shortname="y_max2"/>
          <dl_setting var="cod_cb_min2"   min="0" step="1" max="255" shortname="u_min2"/>

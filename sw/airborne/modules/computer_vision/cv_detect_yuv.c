@@ -72,6 +72,16 @@ uint8_t cod_cb_max2 = 0;
 uint8_t cod_cr_min2 = 0;
 uint8_t cod_cr_max2 = 0;
 
+bool detect_tree = true;
+
+uint8_t tree_y_min = 0;
+uint8_t tree_y_max = 0;
+uint8_t tree_u_min = 0;
+uint8_t tree_u_max = 0;
+uint8_t tree_v_min = 0;
+uint8_t tree_v_max = 0;
+uint8_t tree_top_height = 80; // only camera 1 is front camera
+
 bool cod_draw1 = false;
 bool cod_draw2 = false;
 
@@ -81,6 +91,12 @@ uint32_t threshold_sideways = 5000;
 float image_middle_proportion = 0.33f;
 float middle_threshold_proportion = 0.5f;
 float sideways_threshold_proportion = 0.2f;
+
+uint32_t middle_threshold_pixel = 0;
+uint32_t sideways_threshold_pixel = 0;
+uint32_t tree_threshold_pixel = 0;
+
+float tree_threshold_proportion = 0.2f;
 
 float edge_detect_proportion = 0.8f;
 
@@ -124,6 +140,8 @@ struct green_object_t {
   uint32_t threshold_middle;
   uint32_t threshold_sideways;
   uint32_t strategy;
+  uint32_t count_tree_middle;
+  uint32_t tree_threshold;
   bool updated;
 };
 
@@ -149,7 +167,7 @@ void find_object_counts(struct image_t *img, bool draw,
                               uint8_t lum_min, uint8_t lum_max,
                               uint8_t cb_min, uint8_t cb_max,
                               uint8_t cr_min, uint8_t cr_max,
-                              uint8_t bottom_height);
+                              uint8_t height_low, uint8_t height_high, bool is_combined);
 
 // ground detection
 uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool draw,
@@ -241,50 +259,32 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
   }
   else if (detection_mode == GREEN_DETECTOR)
   {
-    // uint8_t lum_min, lum_max;
-    // uint8_t cb_min, cb_max;
-    // uint8_t cr_min, cr_max;
-    // bool draw;
-
-    // switch (filter){
-    //   case 1:
-    //     lum_min = cod_lum_min1;
-    //     lum_max = cod_lum_max1;
-    //     cb_min = cod_cb_min1;
-    //     cb_max = cod_cb_max1;
-    //     cr_min = cod_cr_min1;
-    //     cr_max = cod_cr_max1;
-    //     draw = cod_draw1;
-    //     break;
-    //   case 2:
-    //     lum_min = cod_lum_min2;
-    //     lum_max = cod_lum_max2;
-    //     cb_min = cod_cb_min2;
-    //     cb_max = cod_cb_max2;
-    //     cr_min = cod_cr_min2;
-    //     cr_max = cod_cr_max2;
-    //     draw = cod_draw2;
-    //     break;
-    //   default:
-    //     return img;
-    // };
-
+    // green detection
     uint32_t count_left = 0;
     uint32_t count_middle = 0; // !!! if not initialize again, just define it, it will be very large values, seems use last loop's result
     uint32_t count_right = 0;
     // Filter and find centroid
     find_object_counts(
       img, draw, &count_left, &count_middle, &count_right,
-      lum_min, lum_max, cb_min, cb_max, cr_min, cr_max, green_bottom_height);
-    // VERBOSE_PRINT("Color count %d: %u, threshold %u, x_c %d, y_c %d\n", camera, object_count, count_threshold, x_c, y_c);
-    // VERBOSE_PRINT("centroid %d: (%d, %d) r: %4.2f a: %4.2f\n", camera, x_c, y_c,
-          // hypotf(x_c, y_c) / hypotf(img->w * 0.5, img->h * 0.5), RadOfDeg(atan2f(y_c, x_c)));
+      lum_min, lum_max, cb_min, cb_max, cr_min, cr_max, 0, green_bottom_height, false);
+    
+    // tree detection
+    uint32_t count_tree_left = 0; // not used
+    uint32_t count_tree_middle = 0; // !!! if not initialize again, just define it, it will be very large values, seems use last loop's result
+    uint32_t count_tree_right = 0; // not used
+    if (detect_tree) 
+    {
+      // Filter and find centroid
+      find_object_counts(
+        img, draw, &count_tree_left, &count_tree_middle, &count_tree_right,
+        tree_y_min, tree_y_max, tree_u_min, tree_u_max, tree_v_min, tree_v_max, 240-tree_top_height, 240, true);
+
+      tree_threshold_pixel = tree_threshold_proportion * 320 * tree_top_height;
+
+    }
 
     pthread_mutex_lock(&mutex);
     //global_filters_green[filter-1].color_count = count;
-    
-    uint32_t middle_threshold_pixel;
-    uint32_t sideways_threshold_pixel;
     
     if (small_window == true){ 
 
@@ -294,58 +294,58 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
 	    {
 	      if (count_left > count_right)
 	      {
-		global_filters_green[filter-1].strategy = ACTION_LEFT;
+		      global_filters_green[filter-1].strategy = ACTION_LEFT;
 	      }
 	      else
 	      {
-		global_filters_green[filter-1].strategy = ACTION_RIGHT;
+		      global_filters_green[filter-1].strategy = ACTION_RIGHT;
 	      }
 	    }
 	    else
 	    {
 	      if (count_left > compare_threshold * count_right && count_left * 2 > compare_threshold * count_middle)
 	      {
-		global_filters_green[filter-1].strategy = ACTION_FORWARD_LEFT;
+		      global_filters_green[filter-1].strategy = ACTION_FORWARD_LEFT;
 	      }
 	      else if (count_right > compare_threshold * count_left && count_right * 2 > compare_threshold * count_middle)
 	      {
-		global_filters_green[filter-1].strategy = ACTION_FORWARD_RIGHT;
+		      global_filters_green[filter-1].strategy = ACTION_FORWARD_RIGHT;
 	      }
 	      else
 	      {
-		global_filters_green[filter-1].strategy = ACTION_FORWARD;
+		      global_filters_green[filter-1].strategy = ACTION_FORWARD;
 	      }
 	    }
     }
     else {
         middle_threshold_pixel = middle_threshold_proportion * img->h * (image_middle_proportion) * green_bottom_height;
-    	sideways_threshold_pixel = sideways_threshold_proportion * img->h * (1.f-image_middle_proportion)/2.f * green_bottom_height;
-    	if (count_middle < middle_threshold_pixel || count_left < sideways_threshold_pixel || count_right < sideways_threshold_pixel)
-    	{
-	      if (count_left > count_right)
-	      {
-		global_filters_green[filter-1].strategy = ACTION_LEFT;
+    	  sideways_threshold_pixel = sideways_threshold_proportion * img->h * (1.f-image_middle_proportion)/2.f * green_bottom_height;
+    	  if (count_middle < middle_threshold_pixel || count_left < sideways_threshold_pixel || count_right < sideways_threshold_pixel)
+    	  {
+	        if (count_left > count_right)
+          {
+            global_filters_green[filter-1].strategy = ACTION_LEFT;
+          }
+          else
+          {
+            global_filters_green[filter-1].strategy = ACTION_RIGHT;
+          }
 	      }
 	      else
 	      {
-		global_filters_green[filter-1].strategy = ACTION_RIGHT;
-	      }
-	    }
-	    else
-	    {
-	      if (count_left > compare_threshold * count_right && count_left > compare_threshold * count_middle)
-	      {
-		global_filters_green[filter-1].strategy = ACTION_FORWARD_LEFT;
-	      }
-	      else if (count_right > compare_threshold * count_left && count_right > compare_threshold * count_middle)
-	      {
-		global_filters_green[filter-1].strategy = ACTION_FORWARD_RIGHT;
-	      }
-	      else
-	      {
-		global_filters_green[filter-1].strategy = ACTION_FORWARD;
-	      }
-    	}
+          if (count_left > compare_threshold * count_right && count_left > compare_threshold * count_middle)
+          {
+		        global_filters_green[filter-1].strategy = ACTION_FORWARD_LEFT;
+	        }
+	        else if (count_right > compare_threshold * count_left && count_right > compare_threshold * count_middle)
+	        {
+		        global_filters_green[filter-1].strategy = ACTION_FORWARD_RIGHT;
+	        }
+	        else
+	        {
+		        global_filters_green[filter-1].strategy = ACTION_FORWARD;
+	        }
+    	  }
     }
 
     global_filters_green[filter-1].threshold_middle = middle_threshold_pixel;
@@ -354,6 +354,9 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
     global_filters_green[filter-1].count_left = count_left;
     global_filters_green[filter-1].count_right = count_right;
     global_filters_green[filter-1].updated = true;
+
+    global_filters_green[filter-1].count_tree_middle = count_tree_middle;
+    global_filters_green[filter-1].tree_threshold = tree_threshold_pixel;
     pthread_mutex_unlock(&mutex);
 
 
@@ -502,6 +505,17 @@ edge_detect_proportion = EDGE_DETECT_PROPORTION;
 
 detection_mode = DETECTION_MODE;
 
+tree_y_min = TREE_Y_MIN;
+tree_y_max = TREE_Y_MAX;
+tree_u_min = TREE_U_MIN;
+tree_u_max = TREE_U_MAX;
+tree_v_min = TREE_V_MIN;
+tree_v_max = TREE_V_MAX;
+tree_top_height = TREE_TOP_HEIGHT;
+
+detect_tree = DETECT_TREE;
+tree_threshold_proportion = TREE_THRESHOLD_PROPORTION;
+
 compare_threshold = COMPARE_THRESHOLD;
 #endif
 }
@@ -511,7 +525,7 @@ void find_object_counts(struct image_t *img, bool draw,
                               uint8_t lum_min, uint8_t lum_max,
                               uint8_t cb_min, uint8_t cb_max,
                               uint8_t cr_min, uint8_t cr_max,
-                              uint8_t bottom_height)
+                              uint8_t height_low, uint8_t height_high, bool is_combined)
 {
   uint32_t cnt = 0;
   uint32_t tot_x = 0;
@@ -524,7 +538,7 @@ void find_object_counts(struct image_t *img, bool draw,
   // Go through all the pixels
   for (uint16_t y = 0; y < img->h; y++) {
     uint8_t count_row = 0;
-    for (uint16_t x = 0; x < bottom_height; x ++) {
+    for (uint16_t x = height_low; x < height_high; x ++) {
       // Check if the color is inside the specified values
       uint8_t *yp, *up, *vp;
       if (x % 2 == 0) {
@@ -551,53 +565,48 @@ void find_object_counts(struct image_t *img, bool draw,
         // printf("bound2 = %f\n", 1-1/num_parts);
         // printf("bound3 = %f\n", img->w * (1-1/num_parts));
         // if (!(loop_count % 100)) printf("bound1 = %d\n", img->w); //{printf("current x: %u, ", x);}
-        if (small_window == true){
-        if (y < 180&& y > 100 ) {
-		  *count_left += 1;
-		  // if (!(loop_count % 100)) {printf("1\n");}
-		} else if (y > 340 && y < 420 ) {
-		  *count_right += 1;
-		  // if (!(loop_count % 100)) {printf("2\n");}
-		} else if (y > 180 && y < 340) {
-		  *count_middle += 1;
-		  // if (!(loop_count % 100)) {printf("3\n");}
-		}
+        if (is_combined) {
+          if (y > 100 && y < 420) {
+            *count_middle +=1;
+          }
         }
         else {
-		if (y < img->h * (0.5 - image_middle_proportion/2.0f)) {
-		  *count_left += 1;
-		  // if (!(loop_count % 100)) {printf("1\n");}
-		} else if (y > img->h * (0.5 + image_middle_proportion/2.0f)) {
-		  *count_right += 1;
-		  // if (!(loop_count % 100)) {printf("2\n");}
-		} else {
-		  *count_middle += 1;
-		  // if (!(loop_count % 100)) {printf("3\n");}
+          if (small_window == true){
+            if (y < 180 && y > 100 ) {
+              *count_left += 1;
+            } else if (y > 340 && y < 420 ) {
+              *count_right += 1;
+            } else if (y > 180 && y < 340) {
+              *count_middle += 1;
+            }
+          }
+          else {
+            if (y < img->h * (0.5 - image_middle_proportion/2.0f)) {
+              *count_left += 1;
+            } else if (y > img->h * (0.5 + image_middle_proportion/2.0f)) {
+              *count_right += 1;
+            } else {
+              *count_middle += 1;
+            }
+          }
         }
-	}
-
-        if (draw){
+        if (draw) {
           // *yp = 255;  // make pixel brighter in image
-          *yp = 76;
-          *up = 55;
-          *vp = 255;
+          if (height_low == 0) { // ground detection using red
+            *yp = 76;
+            *up = 55;
+            *vp = 255;
+          }
+          else // other detection using blue
+          {
+            *yp = 16;
+            *up = 255;
+            *vp = 0;
+          }
         }
       }
-      // loop_count ++;
     }
-    // count_rows[y] = count_row;
   }
-  // printf("loop_count = %u\n", loop_count);
-  /*
-  if (cnt > 0) {
-    *p_xc = (int32_t)roundf(tot_x / ((float) cnt) - img->w * 0.5f);
-    *p_yc = (int32_t)roundf(img->h * 0.5f - tot_y / ((float) cnt));
-  } else {
-    *p_xc = 0;
-    *p_yc = 0;
-  }
-  */
-  // return count_rows;
   return;
 }
 
@@ -1043,29 +1052,25 @@ void color_object_detector_periodic(void)
     memcpy(local_filters, global_filters_green, 2*sizeof(struct green_object_t));
     pthread_mutex_unlock(&mutex);
 
-    if(local_filters[0].updated){
+    if(local_filters[0].updated){ //(int32_t)local_filters[0].,
       AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION1_ID, 
         (int16_t)local_filters[0].count_middle, 
         (int16_t)local_filters[0].count_left,
         (int16_t)local_filters[0].count_right, 
-        (int16_t)local_filters[0].threshold_sideways, 
-        (int32_t)local_filters[0].threshold_middle,
+        (int16_t)local_filters[0].count_tree_middle, 
+        0, 
         (int16_t)local_filters[0].strategy);
       local_filters[0].updated = false;
 
-      printf("Green, L = %d, R = %d, thS = %d, M = %d, thM = %d\n", local_filters[0].count_left, local_filters[0].count_right, \
-        local_filters[0].threshold_sideways, local_filters[0].count_middle, local_filters[0].threshold_middle);
+      printf("Green, T = %d, thT = %d, L = %d, R = %d, thS = %d, M = %d, thM = %d\n", \
+        local_filters[0].count_tree_middle, 
+        local_filters[0].tree_threshold, 
+        local_filters[0].count_left, 
+        local_filters[0].count_right,
+        local_filters[0].threshold_sideways, 
+        local_filters[0].count_middle, 
+        local_filters[0].threshold_middle);
     }
-    // if(local_filters[1].updated){
-    //   AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION2_ID, 
-    //     (int16_t)local_filters[1].count_middle, 
-    //     (int16_t)local_filters[1].count_left,
-    //     (int16_t)local_filters[1].count_right, 
-    //     (int16_t)local_filters[1].threshold_sideways, 
-    //     (int32_t)local_filters[1].threshold_middle,
-    //     (int16_t)local_filters[1].strategy);
-    //   local_filters[1].updated = false;
-    // }
   }
   else if (detection_mode == EDGE_DETECTOR)
   {

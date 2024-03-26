@@ -72,6 +72,16 @@ extern uint8_t cod_cb_max2;
 extern uint8_t cod_cr_min2;
 extern uint8_t cod_cr_max2;
 
+extern bool detect_tree;
+
+extern uint8_t tree_y_min;
+extern uint8_t tree_y_max;
+extern uint8_t tree_u_min;
+extern uint8_t tree_u_max;
+extern uint8_t tree_v_min;
+extern uint8_t tree_v_max;
+extern uint8_t tree_top_height; // only camera 1 is front camera
+
 extern bool cod_draw1;
 extern bool cod_draw2;
 extern bool small_window;
@@ -85,9 +95,14 @@ extern uint16_t pixel_variance_threshold;
 extern uint32_t threshold_middle;
 extern uint32_t threshold_sideways;
 
+extern uint32_t middle_threshold_pixel;
+extern uint32_t sideways_threshold_pixel;
+extern uint32_t tree_threshold_pixel;
+
 extern float image_middle_proportion;
 extern float middle_threshold_proportion;
 extern float sideways_threshold_proportion;
+extern float tree_threshold_proportion;
 extern uint8_t green_bottom_height;
 extern uint8_t detection_mode;
 

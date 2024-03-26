@@ -70,6 +70,7 @@ int32_t degree_to_rotate = 0;
 uint32_t count_middle = 0;
 uint32_t count_left = 0;
 uint32_t count_right = 0;
+uint32_t count_tree = 0;
 
 const int16_t max_trajectory_confidence = 5; // number of consecutive negative object detections to be sure we are obstacle free
 
@@ -135,8 +136,11 @@ static void green_detection_cb(uint8_t __attribute__((unused)) sender_id,
   count_middle = pixel_x;
   count_left = pixel_y;
   count_right = pixel_width;
-  threshold_sideways = pixel_height;
-  threshold_middle = quality;
+  // threshold_sideways = pixel_height;
+  // threshold_middle = quality;
+  count_tree = pixel_height;
+  // tree_threshold_pixel, middle_threshold_pixel, sideways_threshold_pixel already included.
+
   green_detect_result = extra;
   // printf("green_detect_result = %d\n", green_detect_result);
 }
@@ -275,7 +279,8 @@ void green_tracker_periodic(void)
     case SAFE:
       accel_cnt ++;
       if ( ((green_detect_result != ACTION_FORWARD) && compare_middle_left_right) ||\
-        ((green_detect_result == ACTION_LEFT || green_detect_result == ACTION_RIGHT) && !compare_middle_left_right))
+        ((green_detect_result == ACTION_LEFT || green_detect_result == ACTION_RIGHT) && !compare_middle_left_right) ||\
+        count_tree > tree_threshold_pixel)
       { // it should be able to detect the boundary as well
         green_tracker_direction = green_detect_result;
         navigation_state = OBSTACLE_FOUND;
@@ -378,25 +383,21 @@ void green_tracker_periodic(void)
       // if (obstacle_free_confidence >= 2){
       //   navigation_state = SAFE;
       if (!slight_turn){
-      	if ( ((count_middle > hysteresis_coeff * threshold_middle) &&\
-              (count_left > hysteresis_coeff * threshold_sideways) &&\
-              (count_right > hysteresis_coeff * threshold_sideways) &&\
-              (count_middle > hysteresis_coeff * count_left) &&\
-              (count_middle > hysteresis_coeff * count_right) &&\
-              compare_middle_left_right) ||\
-             ((count_middle > hysteresis_coeff * threshold_middle) &&\
-              (count_left > hysteresis_coeff * threshold_sideways) &&\
-              (count_right > hysteresis_coeff * threshold_sideways) &&\
-              !compare_middle_left_right))
+      	if (  ((hysteresis_coeff * count_tree < tree_threshold_pixel) || !detect_tree) &&\
+              (count_middle > hysteresis_coeff * middle_threshold_pixel) &&\
+              (count_left > hysteresis_coeff * sideways_threshold_pixel) &&\
+              (count_right > hysteresis_coeff * sideways_threshold_pixel) &&\
+              (((count_middle > hysteresis_coeff * count_left) && (count_middle > hysteresis_coeff * count_right)) || !compare_middle_left_right))
       	{
         	navigation_state = SAFE;
       	}
       }
       else{
-        if((count_middle > hysteresis_coeff * threshold_middle) &&\
-           (count_left > hysteresis_coeff * threshold_sideways) &&\
-           (count_right > hysteresis_coeff * threshold_sideways) &&\
-           green_detect_result == ACTION_FORWARD)
+        if(((hysteresis_coeff * count_tree < tree_threshold_pixel) || !detect_tree) &&\
+           (count_middle > hysteresis_coeff * middle_threshold_pixel) &&\
+           (count_left > hysteresis_coeff * sideways_threshold_pixel) &&\
+           (count_right > hysteresis_coeff * sideways_threshold_pixel) &&\
+           green_detect_result == ACTION_FORWARD) // shall we use hysteresis here again?
         {
           navigation_state = SAFE;
         }

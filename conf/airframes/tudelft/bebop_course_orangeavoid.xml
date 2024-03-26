@@ -36,6 +36,18 @@
 
       <define name="COLOR_OBJECT_DETECTOR_BOTTOM_HEIGHT1" value="80"/>
 
+      <!-- Detect tree -->
+      <define name="TREE_Y_MIN" value="55"/>
+      <define name="TREE_Y_MAX" value="100"/>
+      <define name="TREE_U_MIN" value="75"/>
+      <define name="TREE_U_MAX" value="105"/>
+      <define name="TREE_V_MIN" value="120"/>
+      <define name="TREE_V_MAX" value="140"/>
+
+      <define name="TREE_TOP_HEIGHT" value="80"/>
+      <define name="DETECT_TREE" value="FALSE"/>
+      <define name="TREE_THRESHOLD_PROPORTION" value="0.09"/>
+
       <!-- control -->
       <define name="MAX_DISTANCE" value="2.25"/>
       <define name="FORWARD_VEL" value="0.5"/>
@@ -97,6 +109,18 @@
       <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="125"/>
 
       <define name="COLOR_OBJECT_DETECTOR_BOTTOM_HEIGHT1" value="80"/>
+
+      <!-- Detect tree -->
+      <define name="TREE_Y_MIN" value="50"/>
+      <define name="TREE_Y_MAX" value="170"/>
+      <define name="TREE_U_MIN" value="90"/>
+      <define name="TREE_U_MAX" value="140"/>
+      <define name="TREE_V_MIN" value="100"/>
+      <define name="TREE_V_MAX" value="130"/>
+
+      <define name="TREE_TOP_HEIGHT" value="80"/>
+      <define name="DETECT_TREE" value="FALSE"/>
+      <define name="TREE_THRESHOLD_PROPORTION" value="0.09"/>
 
       <!-- control -->
       <define name="MAX_DISTANCE" value="2.25"/>
