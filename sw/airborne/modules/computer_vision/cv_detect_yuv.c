@@ -577,7 +577,10 @@ void find_object_counts(struct image_t *img, bool draw,
 	}
 
         if (draw){
-          *yp = 255;  // make pixel brighter in image
+          // *yp = 255;  // make pixel brighter in image
+          *yp = 76;
+          *up = 55;
+          *vp = 255;
         }
       }
       // loop_count ++;
