@@ -45,8 +45,9 @@
       <define name="TREE_V_MAX" value="140"/>
 
       <define name="TREE_TOP_HEIGHT" value="80"/>
-      <define name="DETECT_TREE" value="FALSE"/>
+      <define name="DETECT_TREE" value="TRUE"/>
       <define name="TREE_THRESHOLD_PROPORTION" value="0.09"/>
+      <!-- 0.09 0.04-->
 
       <!-- control -->
       <define name="MAX_DISTANCE" value="2.25"/>
@@ -74,7 +75,7 @@
       <define name="IMAGE_MIDDLE_PROPORTION" value="0.33"/>
       <define name="MIDDLE_THRESHOLD_PROPORTION" value="0.39"/> 
       <!-- 0.30 increase -->
-      <define name="SIDEWAYS_THRESHOLD_PROPORTION" value="0.10"/> 
+      <define name="SIDEWAYS_THRESHOLD_PROPORTION" value="0.17"/> 
       <!-- 0.11 -->
       <define name="MIN_ACCEL_CNT" value="20"/> 
       <define name="HYSTERESIS_COEFF" value="1.2"/> 
@@ -119,7 +120,7 @@
       <define name="TREE_V_MAX" value="130"/>
 
       <define name="TREE_TOP_HEIGHT" value="80"/>
-      <define name="DETECT_TREE" value="FALSE"/>
+      <define name="DETECT_TREE" value="TRUE"/>
       <define name="TREE_THRESHOLD_PROPORTION" value="0.09"/>
 
       <!-- control -->
