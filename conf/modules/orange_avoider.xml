@@ -17,6 +17,7 @@ so you have to define which filter to use with the ORANGE_AVOIDER_VISUAL_DETECTI
     <dl_settings>
       <dl_settings name="OrangeAvoider">
         <!-- <dl_setting var="oa_color_count_frac" min="0" step="0.01" max="0.5"/> -->
+        <dl_setting var="flight_altitude" MIN="0" STEP="0.01" MAX="2" module="navigation" unit="m" handler="SetFlightAltitude"/>
         <dl_setting var="maxDistance" min="0" step="0.01" max="10"/>
         <dl_setting var="forward_vel" min="0" step="0.1" max="2"/>
         <dl_setting var="backward_vel" min="0" step="0.1" max="1"/>

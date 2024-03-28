@@ -20,6 +20,7 @@
 #include "modules/orange_avoider/orange_avoider.h"
 #include "firmwares/rotorcraft/navigation.h"
 #include "firmwares/rotorcraft/guidance/guidance_h.h"
+#include "firmwares/rotorcraft/guidance/guidance_v.h"
 #include "generated/airframe.h"
 #include "state.h"
 #include "modules/core/abi.h"
@@ -267,6 +268,13 @@ void orange_avoider_periodic(void)
 // SOMETHING CHANGJUN ADDED
 void green_tracker_periodic(void)
 {
+  //debug
+  // flight_altitude = 1.9f;
+  // GuidanceVSetRef(stateGetPositionNed_i()->z, stateGetSpeedNed_i()->z, 0);
+  // printf("%d\n", stateGetPositionNed_i()->z);
+  // printf("%d\n", stateGetPositionEnu_i()->z);
+  // NavVerticalAltitudeMode(desired_z, 0.f);
+  // GuidanceVSetRef(desired_delta_z, 0, 0);
   // only evaluate our state machine if we are flying
   if(!autopilot_in_flight()){
     return;
