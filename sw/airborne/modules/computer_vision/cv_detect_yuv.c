@@ -75,9 +75,18 @@ uint8_t cod_cr_max2 = 0;
 bool cod_draw1 = false;
 bool cod_draw2 = false;
 
+/*
+ * This is the threshold for the comparison between the histogram of the front camera and bottom camera.
+ * We use a dot production to compare the histograms of the front camera and bottom camera.
+ */
 uint32_t threshold_middle = 8000;
 uint32_t threshold_sideways = 5000;
 
+
+/*
+ * This is the threshold for the proprotion of the green pixel in the bottom part of the image.
+ * If the proportion falls below the threshold, it indicates the detection of an obstacle.
+ */
 float image_middle_proportion = 0.33f;
 float middle_threshold_proportion = 0.5f;
 float sideways_threshold_proportion = 0.2f;
@@ -86,6 +95,7 @@ float edge_detect_proportion = 0.8f;
 
 uint8_t detection_mode = GREEN_DETECTOR;
 
+// sum of the green pixel in the left, middle and left part of the image
 uint32_t sum_left = 0;
 uint32_t sum_mid = 0;
 uint32_t sum_right = 0; 
@@ -105,7 +115,9 @@ uint16_t free_space_threshold = 10;
 bool small_window = true; // true: the drone is using a small central window
 float compare_threshold = 1.1f;
 
-// define global variables
+/*
+ * This is the variable to reveive the message from the floor detection with bottom camera
+ */
 struct ground_object_t {
   int32_t x_c;
   int32_t y_c;
@@ -117,6 +129,10 @@ struct ground_object_t {
   uint8_t strategy;
 };
 
+/*
+ * This is the variable to reveive the message from the floor detection with bottom camera.
+ * The most important message is the number of the green pixels in three parts of the image.
+ */
 struct green_object_t {
   uint32_t count_middle;
   uint32_t count_left;
@@ -127,6 +143,9 @@ struct green_object_t {
   bool updated;
 };
 
+/*
+ * This is the variable to reveive the message from the edge detection
+ */
 struct edge_t {
   // int32_t x_c;
   // int32_t y_c;
@@ -167,10 +186,19 @@ uint16_t median_filter(uint16_t *array, uint16_t length);
 int compare (const void * a, const void * b);               
 unsigned char * YUV2Gray(struct image_t *img);
 
+
+
+
+
+
 /*
  * this is the function for the object detector of the front camera
- * 1. we will get the histogram of three different part in the front camera
- * 2. if we have get the histogram from the bottom camera, we will make a comparision between these histograms
+ * if we use GROUND DETECTION:
+ * 	1. We will get the histogram of three different part in the front camera
+ * 	2. If we have get the histogram from the bottom camera, we will make a comparision between these histograms
+ * if we use COLOR DETECTION:
+ * 	1. Filter the green color from the three parts of the image.
+ * 	2. Make the strategy according to the proportion of the green pixels in three parts and their threshold.
  */
 static struct image_t *object_detector_front(struct image_t *img, uint8_t filter)
 {
@@ -224,9 +252,6 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
 
     // Filter and find centroid
     uint32_t count = histogram_front(img, &x_c, &y_c, draw, lum_min, lum_max, cb_min, cb_max, cr_min, cr_max, yd, ud, vd, &strategy);
-    //VERBOSE_PRINT("Color count %d: %u, threshold %u, x_c %d, y_c %d\n", camera, object_count, count_threshold, x_c, y_c);
-    //VERBOSE_PRINT("centroid %d: (%d, %d) r: %4.2f a: %4.2f\n", camera, x_c, y_c,
-          //hypotf(x_c, y_c) / hypotf(img->w * 0.5, img->h * 0.5), RadOfDeg(atan2f(y_c, x_c)));
 
     pthread_mutex_lock(&mutex);
     global_filters_ground[filter-1].color_count = count;
@@ -286,7 +311,11 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
     uint32_t middle_threshold_pixel;
     uint32_t sideways_threshold_pixel;
     
-    if (small_window == true){ 
+    /*
+     * This is the part to make the strategy according to the proportion and the threshold.
+     */
+    
+    if (small_window == true){ // if we choose to use the smaller window in the image
 
 	    middle_threshold_pixel = middle_threshold_proportion * 160 * green_bottom_height;
 	    sideways_threshold_pixel = sideways_threshold_proportion * 80 * green_bottom_height;
@@ -347,7 +376,10 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
 	      }
     	}
     }
-
+    
+    /*
+     * Save the message within the global variable, ready to be included in the ABI message when sent.
+     */
     global_filters_green[filter-1].threshold_middle = middle_threshold_pixel;
     global_filters_green[filter-1].count_middle = count_middle;
     global_filters_green[filter-1].threshold_sideways = sideways_threshold_pixel;
@@ -382,7 +414,10 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
           local_filter.strategy = ACTION_FORWARD;
         }
     }
-
+    
+    /*
+     * Save the message within the global variable, ready to be included in the ABI message when sent.
+     */
     pthread_mutex_lock(&mutex);
     global_filters_edge[filter-1].highest_column_idx = local_filter.highest_column_idx;
     global_filters_edge[filter-1].highest_edge_height = local_filter.highest_edge_height;
@@ -394,6 +429,10 @@ static struct image_t *object_detector_front(struct image_t *img, uint8_t filter
   }
   return img;
 }
+
+
+
+
 
 
 /*
@@ -428,11 +467,18 @@ static struct image_t *object_detector_bottom(struct image_t *img, uint8_t filte
   }
   else if (detection_mode == GREEN_DETECTOR || detection_mode == EDGE_DETECTOR)
   {
-    // do nothing
+    // do nothing if we choose the other modes
   }
   return img;
 }
 
+
+
+
+
+/*
+ * this is the callback function used in cv_add_to_device
+ */
 struct image_t *object_detector1(struct image_t *img, uint8_t camera_id);
 struct image_t *object_detector1(struct image_t *img, uint8_t camera_id __attribute__((unused)))
 {
@@ -506,6 +552,15 @@ compare_threshold = COMPARE_THRESHOLD;
 #endif
 }
 
+
+
+
+
+
+/*
+ * This is the function to count the green pixels in three parts of the image.
+ * The green filter is made with YUV threshold.
+ */
 void find_object_counts(struct image_t *img, bool draw,
                               uint32_t* count_left, uint32_t* count_middle, uint32_t* count_right,
                               uint8_t lum_min, uint8_t lum_max,
@@ -532,11 +587,9 @@ void find_object_counts(struct image_t *img, bool draw,
         up = &buffer[y * 2 * img->w + 2 * x];      // U
         yp = &buffer[y * 2 * img->w + 2 * x + 1];  // Y1
         vp = &buffer[y * 2 * img->w + 2 * x + 2];  // V
-        //yp = &buffer[y * 2 * img->w + 2 * x + 3]; // Y2
       } else {
         // Uneven x
         up = &buffer[y * 2 * img->w + 2 * x - 2];  // U
-        //yp = &buffer[y * 2 * img->w + 2 * x - 1]; // Y1
         vp = &buffer[y * 2 * img->w + 2 * x];      // V
         yp = &buffer[y * 2 * img->w + 2 * x + 1];  // Y2
       }
@@ -597,6 +650,10 @@ void find_object_counts(struct image_t *img, bool draw,
   // return count_rows;
   return;
 }
+
+
+
+
 
 
 /* this function is to calculate the color histogram from the image of the front camera
@@ -703,19 +760,14 @@ uint32_t histogram_front(struct image_t *img, int32_t* p_xc, int32_t* p_yc, bool
     }
     else {*strategy = ACTION_FORWARD;}
   }
-  // if 
-  // if (sum_left>biggest_direction){
-  //   biggest_direction = sum_left;
-  //   *strategy = 1;
-  // }
-  // if (sum_right > biggest_direction){
-  //   biggest_direction = sum_right;
-  //   *strategy = 2;
-  // }
-  //printf("the current strategy is %d\n", *strategy);
   
   return cnt;
 }
+
+
+
+
+
 
 /* this function is to calculate the color histogram from the image of the bottom camera
  * it will send the histogram back with a pointer of an array
@@ -749,7 +801,12 @@ void histogram_bottom(struct image_t *img, uint16_t *yd, uint16_t *ud, uint16_t 
 }
 
 
-// calculate the relationship parameter between two histogram
+
+
+
+/* This function is to make comparison between two histograms.
+ * The similaritiy is calculated through a dot production between two histogram.
+ */
 uint32_t multiply(uint16_t *yd_bot, uint16_t *ud_bot, uint16_t *vd_bot, uint16_t *yd, uint16_t *ud, uint16_t *vd){
   uint32_t sum_yd = 0;
   uint32_t sum_ud = 0;
@@ -764,6 +821,11 @@ uint32_t multiply(uint16_t *yd_bot, uint16_t *ud_bot, uint16_t *vd_bot, uint16_t
 }
 
 
+
+
+
+/* This function is to turn the YUV image into grayscale image.
+ */
 unsigned char * YUV2Gray(struct image_t *img)
 {
   uint8_t *buffer = img->buf;
@@ -794,6 +856,11 @@ unsigned char * YUV2Gray(struct image_t *img)
 }
 
 
+
+
+
+/* This function is to filter the median number from an array
+ */
 uint16_t median_filter(uint16_t *array, uint16_t length)
 {
   uint16_t *array_sorted = (uint16_t *)malloc(length * sizeof(uint16_t));
@@ -810,6 +877,12 @@ int compare (const void * a, const void * b)
 }
 
 
+
+
+
+
+/* This function is to find the edge in the image
+ */
 void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, float sigma, float tlow, float thigh)
 {
   uint8_t *buffer = img->buf;
@@ -994,8 +1067,13 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
 }
 
 
+/* This function is the periodic function to send the message.
+ * 1. Get the detection information from global_filters and save the message in local_filters.
+ * 2. Send the information through the abi message.
+ */
 void color_object_detector_periodic(void)
 {
+  // this is for the ground detection
   if (detection_mode == GROUND_DETECTOR)
   {
     global_filters_green[0].updated = false;
@@ -1005,11 +1083,13 @@ void color_object_detector_periodic(void)
     global_filters_edge[1].updated = false;
 
     static struct ground_object_t local_filters[2];
+    
+    // read the message from the global_filters
     pthread_mutex_lock(&mutex);
     memcpy(local_filters, global_filters_ground, 2*sizeof(struct ground_object_t));
-    //printf("the current strategy from the cv detector is %d", local_filters[0].strategy);
     pthread_mutex_unlock(&mutex);
-
+    
+    // send the information
     if(local_filters[0].updated){
       AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION1_ID, 
         local_filters[0].x_c, 
@@ -1021,12 +1101,9 @@ void color_object_detector_periodic(void)
       local_filters[0].updated = false;
       printf("Ground, L = %d, M = %d, R = %d\n", sum_left, sum_mid, sum_right);
     }
-    // if(local_filters[1].updated){
-    //   AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION2_ID, local_filters[1].x_c, local_filters[1].y_c,
-    //       0, 0, local_filters[1].color_count, 1);
-    //   local_filters[1].updated = false;
-    // }
   }
+  
+  // this is for the green detection
   else if (detection_mode == GREEN_DETECTOR)
   {
     global_filters_ground[0].updated = false;
@@ -1036,10 +1113,13 @@ void color_object_detector_periodic(void)
     global_filters_edge[1].updated = false;
 
     static struct green_object_t local_filters[2];
+    
+    // read the message from the global_filters
     pthread_mutex_lock(&mutex);
     memcpy(local_filters, global_filters_green, 2*sizeof(struct green_object_t));
     pthread_mutex_unlock(&mutex);
-
+    
+    // send the information
     if(local_filters[0].updated){
       AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION1_ID, 
         (int16_t)local_filters[0].count_middle, 
@@ -1053,17 +1133,9 @@ void color_object_detector_periodic(void)
       printf("Green, L = %d, R = %d, thS = %d, M = %d, thM = %d\n", local_filters[0].count_left, local_filters[0].count_right, \
         local_filters[0].threshold_sideways, local_filters[0].count_middle, local_filters[0].threshold_middle);
     }
-    // if(local_filters[1].updated){
-    //   AbiSendMsgVISUAL_DETECTION(COLOR_OBJECT_DETECTION2_ID, 
-    //     (int16_t)local_filters[1].count_middle, 
-    //     (int16_t)local_filters[1].count_left,
-    //     (int16_t)local_filters[1].count_right, 
-    //     (int16_t)local_filters[1].threshold_sideways, 
-    //     (int32_t)local_filters[1].threshold_middle,
-    //     (int16_t)local_filters[1].strategy);
-    //   local_filters[1].updated = false;
-    // }
   }
+  
+  // this is for the edge detection
   else if (detection_mode == EDGE_DETECTOR)
   {
     global_filters_green[0].updated = false;

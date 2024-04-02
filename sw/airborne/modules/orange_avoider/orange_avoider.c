@@ -73,6 +73,9 @@ uint32_t count_right = 0;
 
 const int16_t max_trajectory_confidence = 5; // number of consecutive negative object detections to be sure we are obstacle free
 
+/*
+ * These bool variables are used to control some tricks in the process
+ */
 bool random_rotate_avoid = true; // = true's reason: difficult to make sure the obstacle avoid is not triggerrd before out of bound when facing outside, and if keeps rotate deterministic it will face dead lock
 bool compare_middle_left_right = false; // true --> feasible direction not only requrire middle > threshold, but also require middle > left and right
 bool enable_bounds_detect = false; // true --> enable OUT_OF_BOUNDS state detection
@@ -98,6 +101,10 @@ uint16_t min_accel_cnt = 20;
 uint16_t accel_cnt = 0;
 
 float hysteresis_coeff = 1.2f;
+
+
+
+
 
 /*
  * This next section defines an ABI messaging event (http://wiki.paparazziuav.org/wiki/ABI), necessary
@@ -141,6 +148,11 @@ static void green_detection_cb(uint8_t __attribute__((unused)) sender_id,
   // printf("green_detect_result = %d\n", green_detect_result);
 }
 
+
+
+
+
+
 /*
  * Initialisation function, setting the colour filter, random seed and heading_increment
  */
@@ -153,7 +165,14 @@ void orange_avoider_init(void)
   // bind our colorfilter callbacks to receive the color filter outputs
   AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &color_detection_ev, color_detection_cb);
 }
-// SOMETHING CHANGJUN ADDED
+
+
+
+
+
+/*
+ * Initialisation function for the floor detection
+ */
 void green_tracker_init(void)
 {
   // Initialise random values
@@ -162,7 +181,6 @@ void green_tracker_init(void)
 
   // bind our colorfilter callbacks to receive the color filter outputs
   AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, green_detection_cb);
-  // AbiBindMsgVISUAL_DETECTION(ORANGE_AVOIDER_VISUAL_DETECTION_ID, &green_detection_ev, general_detection_cb);
 
   #ifdef FORWARD_VEL
   maxDistance = MAX_DISTANCE;
@@ -181,8 +199,24 @@ void green_tracker_init(void)
   #endif
 }
 //END of CHANGJUN ADDED PART 
+
+
+
+
+
+
 /*
+ * This is the state machine for the NAV mode. (WE DID NOT USE IN THE TEST!!!!!)
  * Function that checks it is safe to move forwards, and then moves a waypoint forward or changes the heading
+ * The function contains the following 4 states:
+ * 	1. Safe: Moving forward when there is not any obstacle in front of the drone
+ *
+ * 	2. Obstacle found: When the figure is out of the threshold, we switch the state to obstacle found, it will stop the drone.
+ *
+ * 	3. Search for safe heading: When the drone found the obstacle or go out of bound, it will find a safe direction.
+ *
+ * 	4. Out of bound: Use the number of the green pixels from the front camera to find if the drone is out of bounday.
+ *
  */
 void orange_avoider_periodic(void)
 {
@@ -260,7 +294,28 @@ void orange_avoider_periodic(void)
   }
   return;
 }
-// SOMETHING CHANGJUN ADDED
+
+
+
+
+
+
+/*
+ * This is the state machine for the GUIDED mode. (WE USE IN THE TEST!!!!!)
+ * In this function, we give the command through the foward, backward and angular velocity. 
+ * The function contains the following 4 states:
+ * 	1. Safe: Moving forward when there is not any obstacle in front of the drone.
+ * 		 Also the drone will make slight turning while moving forward if it think the right or left as a promising direction.
+ *
+ * 	2. Obstacle found: When the figure is out of the threshold, we switch the state to obstacle found, it will stop the drone.
+ *
+ * 	3. Search for safe heading: When the drone found the obstacle or go out of bound, it will find a safe direction.
+ * 				    The safety threshold for heading is stricter than that for obstacle detection, preventing incautious drone detections. 
+ *
+ * 	4. Out of bound: Use the number of the green pixels from the front camera to find if the drone is out of bounday.
+ *
+ * 	5. Move back: Move Back a little when finding the direction, this is to avoid the collision while turning.
+ */
 void green_tracker_periodic(void)
 {
   // only evaluate our state machine if we are flying
@@ -466,6 +521,11 @@ void green_tracker_periodic(void)
   
 }
 //END of CHANGJUN ADDED PART 
+
+
+
+
+
 /*
  * Increases the NAV heading. Assumes heading is an INT32_ANGLE. It is bound in this function.
  */
@@ -484,6 +544,9 @@ uint8_t increase_nav_heading(float incrementDegrees)
 }
 
 
+
+
+
 /*
  * Calculates coordinates of distance forward and sets waypoint 'waypoint' to those coordinates
  */
@@ -494,6 +557,10 @@ uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters)
   moveWaypoint(waypoint, &new_coor);
   return false;
 }
+
+
+
+
 
 /*
  * Calculates coordinates of a distance of 'distanceMeters' forward w.r.t. current position and heading
@@ -511,6 +578,11 @@ uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters)
   return false;
 }
 
+
+
+
+
+
 /*
  * Sets waypoint 'waypoint' to the coordinates of 'new_coor'
  */
@@ -521,6 +593,11 @@ uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor)
   waypoint_move_xy_i(waypoint, new_coor->x, new_coor->y);
   return false;
 }
+
+
+
+
+
 
 /*
  * Sets the variable 'heading_increment' randomly positive/negative
@@ -538,6 +615,15 @@ uint8_t chooseRandomIncrementAvoidance(void)
   return false;
 }
 
+
+
+
+
+
+/*
+ * Sets the variable 'heading_increment' according to the direction.
+ * It will choose the direction with more green pixels.
+ */
 uint8_t chooseSelectedIncrementAvoidance(int16_t detect_result)
 {
   // Randomly choose CW or CCW avoiding direction
