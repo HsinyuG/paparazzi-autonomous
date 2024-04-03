@@ -1,4 +1,4 @@
-# README
+# Autonomous Flight of Micro Air Vehicles
 
 Introduction
 =============
@@ -128,7 +128,7 @@ Performance
 Simulation
 -----------------
 
-Below is a video depicting the simulation flight. Similar to real flight conditions, we periodically introduce new obstacles every thirty seconds to enhance the task's difficulty.
+Below is a video depicting the simulation flight. Similar to real flight conditions, we periodically introduce new obstacles every thirty seconds to enhance the task's difficulty. (Not applicable in GitHub)
 
 <div style="text-align:center;">
   <video width="960" height="560" controls>
@@ -140,7 +140,7 @@ Below is a video depicting the simulation flight. Similar to real flight conditi
 
 Real Environment
 -----------------
-Below is a video depicting the real flight in Cyberzoo.
+Below is a video depicting the real flight in Cyberzoo. (Not applicable in GitHub)
 
 <div style="text-align:center;">
   <video width="360" height="640" controls>
