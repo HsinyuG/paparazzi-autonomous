@@ -1,4 +1,4 @@
-# MAIN README
+# README
 
 Introduction
 =============
