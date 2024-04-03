@@ -63,7 +63,6 @@ Quick start:
 ```bash
 git clone https://github.com/HsinyuG/paparazzi-autonomous.git
 cd ./paparazzi-autonomous
-git checkout -b green_detector_slight_tree origin/green_detector_slight_tree
 ./install.sh
 ```
 
