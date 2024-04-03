@@ -58,6 +58,7 @@
 #endif
 
 // Module settings
+// this is the yuv threshold for the floor detection
 extern uint8_t cod_lum_min1;
 extern uint8_t cod_lum_max1;
 extern uint8_t cod_cb_min1;
@@ -74,6 +75,7 @@ extern uint8_t cod_cr_max2;
 
 extern bool detect_tree;
 
+//this is the yuv threshold for the tree detection
 extern uint8_t tree_y_min;
 extern uint8_t tree_y_max;
 extern uint8_t tree_u_min;
@@ -84,26 +86,27 @@ extern uint8_t tree_top_height; // only camera 1 is front camera
 
 extern bool cod_draw1;
 extern bool cod_draw2;
-extern bool small_window;
-extern float compare_threshold;
+extern bool small_window;// True: use a smaller window in the bottom part of the image
+extern float compare_threshold;// True: compare the number of the green pixel in the left and right part of the image 
 
 extern float sigma1;
 extern float tlow1;
 extern float thigh1;
 extern uint16_t pixel_variance_threshold;
 
-extern uint32_t threshold_middle;
-extern uint32_t threshold_sideways;
+extern uint32_t threshold_middle;// threshold for the number of the pixels in the middle part of the image(for ground detection)
+extern uint32_t threshold_sideways;// threshold for the number of the pixels in the left and right part of the image(for ground detection)
 
 extern uint32_t middle_threshold_pixel;
 extern uint32_t sideways_threshold_pixel;
-extern uint32_t tree_threshold_pixel;
+extern uint32_t tree_threshold_pixel;// threshold for the number of the pixels that stands for a tree in the top part of the image
 
+//this is the variables for the detection window
 extern float image_middle_proportion;
-extern float middle_threshold_proportion;
-extern float sideways_threshold_proportion;
+extern float middle_threshold_proportion;// threshold for the number of the pixels in the middle part of the image(for color detection)
+extern float sideways_threshold_proportion;// threshold for the number of the pixels in the left and right part of the image(for color detection)
 extern float tree_threshold_proportion;
-extern uint8_t green_bottom_height;
+extern uint8_t green_bottom_height;// the height of the detection window in the bottom of the image
 extern uint8_t detection_mode;
 
 extern float edge_detect_proportion;
