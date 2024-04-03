@@ -925,12 +925,12 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
     }
   }
 
-  // find the lowest edge for each column
-  // note - the image is rotated 90 degrees
+  /* 
+   * find the lowest edge for each column
+   * note - the image is rotated 90 degrees clockwise, 
+   * here rows refer to columns in the original image and vice versa
+   */
   uint32_t edge_array_length = rows * cols;
-
-  // uint32_t start_index = rows * (0.5f - edge_detect_proportion/2.f);
-  // uint32_t end_index = rows * (0.5f + edge_detect_proportion/2.f);
 
   uint32_t start_index = 51;
   uint32_t end_index = 350;
@@ -945,20 +945,15 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
     uint32_t current_index = i; // edge_array_length - i - 1;
     uint16_t current_x = current_index % cols;
     uint16_t current_y = current_index / cols;
-    // printf("x: %u, ", current_x);
-    // printf("y: %u, ", current_y);
-    // printf("i: %u, ", current_index);
-    // printf("edge: %u; ", edge[current_index]);
+
     if (current_y > start_index && current_y < end_index) // only use the middle part of the image
     {
-      // if no values assigned to row, assign first edge
+      // If no values are assigned to the current row and there is no edge at the current index, assign the current edge as the first edge
       if ((first_edge_x_each_row[current_y]==cols+1) && !edge[current_index]) {
         first_edge_x_each_row[current_y] = current_x;
-        // printf("x: %u, ", current_x);
-        // printf("y: %u, ", current_y);
       }
-      // if no edge found after iterating through all columns, assin first column as edge
-
+      
+    // If the current column is the last column and the first edge for the current row is still the initial value, assign the first column as the edge
     }
     if (current_x == cols-1 && first_edge_x_each_row[current_y] == cols+1) {
       first_edge_x_each_row[current_y] = 0;
@@ -970,7 +965,6 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
   uint16_t row_with_largest_space = rows/2;
   uint16_t row_with_shortest_space = rows/2;
   int16_t longest_edge_length = -1; // max x is < 255 so okay, longest from botton to top - 240 pixels
-  // printf("cols: %d,", cols);
   uint32_t shortest_edge_length = 1000;
 
   // median filtering, find the largest space
@@ -978,8 +972,6 @@ void find_edge(struct edge_t *local_filter_ptr, struct image_t *img, bool draw, 
     // first_edge_x_each_row_filtered[i-1] = (first_edge_x_each_row[i-1] + first_edge_x_each_row[i] + first_edge_x_each_row[i+1])/3;
     uint16_t edge_array[3] = {first_edge_x_each_row[i-1], first_edge_x_each_row[i], first_edge_x_each_row[i+1]};
     first_edge_x_each_row_filtered[i-1] = median_filter(edge_array, 3);
-    // printf("median: %u, ", first_edge_x_each_row_filtered[i-1]);
-    // printf("%u: %u, ", i-1, first_edge_x_each_row_filtered[i-1]);
     
     // // if variance of edge lengths in edge array is too high, ignore this row, only used to guide the drone!
     // if (abs(first_edge_x_each_row[i-1] - first_edge_x_each_row[i]) > pixel_variance_threshold || 
